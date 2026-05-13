@@ -5,6 +5,7 @@ import PageHero from '../components/common/PageHero'
 import { breathingSteps, groundingSteps } from '../data/mentalData'
 import type { FeatureConfig, PageId } from '../types/sehatara'
 import { createId } from '../utils/assistantResponses'
+import { createIsoTimestamp, formatShortDateTime, isSameLocalDate } from '../utils/dateTime'
 import {
   normalizeDateString,
   readStorageList,
@@ -70,7 +71,7 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
   const elapsedSeconds = activeSession.durationSeconds - remainingSeconds
   const progressPercent = Math.min(100, Math.round((elapsedSeconds / activeSession.durationSeconds) * 100))
   const activeStep = getActiveCalmStep(activeSession, elapsedSeconds)
-  const todaySessionCount = sessionRecords.filter((record) => isSameDate(record.createdAt, new Date())).length
+  const todaySessionCount = sessionRecords.filter((record) => isSameLocalDate(record.createdAt, new Date())).length
   const completedMinutes = Math.round(
     sessionRecords.reduce((total, record) => total + record.durationSeconds, 0) / 60,
   )
@@ -130,7 +131,7 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
       label: activeSession.label,
       durationSeconds: completedDuration,
       mood,
-      createdAt: new Date().toISOString(),
+      createdAt: createIsoTimestamp(),
     }
 
     setIsRunning(false)
@@ -249,7 +250,7 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
                       <strong>{record.label}</strong>
                       <span>
                         Sesi selesai - {formatDuration(record.durationSeconds)} - {getMoodLabel(record.mood)} -{' '}
-                        {formatCalmRecordTime(record.createdAt)}
+                        {formatShortDateTime(record.createdAt)}
                       </span>
                     </div>
                     <button
@@ -356,32 +357,6 @@ function normalizeCalmSessionRecord(value: unknown): CalmSessionRecord | null {
 
 function getModeLabel(mode: CalmMode) {
   return mode === 'breathing' ? 'Napas pelan' : 'Grounding 5-4-3-2-1'
-}
-
-function isSameDate(value: string, date: Date) {
-  const recordDate = new Date(value)
-
-  return (
-    !Number.isNaN(recordDate.getTime()) &&
-    recordDate.getFullYear() === date.getFullYear() &&
-    recordDate.getMonth() === date.getMonth() &&
-    recordDate.getDate() === date.getDate()
-  )
-}
-
-function formatCalmRecordTime(value: string) {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return 'baru saja'
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 function getMoodLabel(value: number) {

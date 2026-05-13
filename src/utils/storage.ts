@@ -1,3 +1,5 @@
+import { isValidDateString } from './dateTime'
+
 export const storageKeys = {
   theme: 'sehatara-theme',
   symptomRecords: 'sehatara-symptom-records',
@@ -138,9 +140,7 @@ export function normalizeOptionalStringList(value: unknown) {
 }
 
 export function normalizeDateString(value: unknown) {
-  return typeof value === 'string' && !Number.isNaN(new Date(value).getTime())
-    ? value
-    : undefined
+  return isValidDateString(value) ? value : undefined
 }
 
 export function isPlainRecord(value: unknown): value is Record<string, unknown> {

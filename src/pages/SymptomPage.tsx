@@ -26,6 +26,7 @@ import type {
 } from '../types/sehatara'
 import { analyzeSymptom, getGeminiAnalysisErrorMessage } from '../utils/geminiSymptomAnalysis'
 import { getIntensityLabel } from '../utils/assistantResponses'
+import { formatShortDateTime } from '../utils/dateTime'
 import { readStorageValue, removeStorageValue, storageKeys, writeStorageValue } from '../utils/storage'
 
 type SymptomPageProps = {
@@ -440,7 +441,7 @@ function SymptomPage({
                         </span>
                       </div>
                       <div className="history-item-footer">
-                        <small>{formatRecordTime(record.createdAt)}</small>
+                        <small>{formatShortDateTime(record.createdAt, 'Baru disimpan')}</small>
                         <button
                           aria-label={`Hapus riwayat ${record.title}`}
                           className="icon-action tiny-danger"
@@ -759,21 +760,6 @@ function formatRecordAreas(record: SavedSymptomRecord) {
       : []
 
   return formatAreaList(recordAreas)
-}
-
-function formatRecordTime(value: string) {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Baru disimpan'
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 function createMedicineHandoff(

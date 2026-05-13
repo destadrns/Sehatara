@@ -15,6 +15,7 @@ import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
 import { medicineChecklist, medicineTopics } from '../data/medicineData'
 import type { FeatureConfig, PageId, SavedMedicineNote } from '../types/sehatara'
+import { createIsoTimestamp, formatShortDateTime } from '../utils/dateTime'
 import {
   normalizeDateString,
   normalizeStringList,
@@ -167,7 +168,7 @@ function MedicinePage({
   function toggleCheckedStatus(noteId: string) {
     updateSavedNoteProgress(noteId, (progress) => ({
       ...progress,
-      checkedAt: progress.checkedAt ? undefined : new Date().toISOString(),
+      checkedAt: progress.checkedAt ? undefined : createIsoTimestamp(),
     }))
   }
 
@@ -370,7 +371,7 @@ function MedicinePage({
                         </button>
                         {activeSavedNoteProgress.checkedAt && (
                           <span className="checked-stamp">
-                            Dicek {formatMedicineCheckedTime(activeSavedNoteProgress.checkedAt)}
+                            Dicek {formatShortDateTime(activeSavedNoteProgress.checkedAt)}
                           </span>
                         )}
                       </div>
@@ -542,21 +543,6 @@ function getSavedNoteChecklist(note: SavedMedicineNote) {
     'Saya paham catatan ini bukan resep atau dosis personal.',
     'Saya tahu kapan perlu bertanya ke apoteker atau dokter.',
   ]
-}
-
-function formatMedicineCheckedTime(value: string) {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return 'baru saja'
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 export default MedicinePage

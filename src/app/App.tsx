@@ -18,6 +18,7 @@ import type {
   ThemeMode,
 } from '../types/sehatara'
 import { createId } from '../utils/assistantResponses'
+import { createIsoTimestamp } from '../utils/dateTime'
 import {
   readStorageList,
   readStorageText,
@@ -87,7 +88,7 @@ function App() {
 
   function saveMedicineNote(note: SaveMedicineNoteInput) {
     setMedicineNotes((current) => [
-      { ...note, id: createId(), createdAt: new Date().toISOString() },
+      { ...note, id: createId(), createdAt: createIsoTimestamp() },
       ...current,
     ].slice(0, storageLimits.medicineNotes))
   }
@@ -102,7 +103,7 @@ function App() {
 
   function saveSymptomRecord(record: SaveSymptomRecordInput) {
     setSymptomRecords((current) => [
-      { ...record, id: createId(), createdAt: new Date().toISOString() },
+      { ...record, id: createId(), createdAt: createIsoTimestamp() },
       ...current,
     ].slice(0, storageLimits.symptomRecords))
   }
@@ -117,7 +118,7 @@ function App() {
 
   function saveWellnessPlan(plan: SaveWellnessPlanInput) {
     setWellnessPlans((current) => [
-      { ...plan, id: createId(), createdAt: new Date().toISOString() },
+      { ...plan, id: createId(), createdAt: createIsoTimestamp() },
       ...current,
     ].slice(0, storageLimits.wellnessPlans))
   }
@@ -139,58 +140,73 @@ function App() {
         theme={theme}
       />
 
-      {renderPage(
+      {renderPage({
         page,
         selectedFeature,
-        navigate,
         symptomRecords,
         medicineNotes,
         wellnessPlans,
-        saveSymptomRecord,
-        deleteSymptomRecord,
-        clearSymptomRecords,
-        saveMedicineNote,
-        deleteMedicineNote,
-        clearMedicineNotes,
-        saveWellnessPlan,
-        deleteWellnessPlan,
-        clearWellnessPlans,
-      )}
+        actions: {
+          navigate,
+          saveSymptomRecord,
+          deleteSymptomRecord,
+          clearSymptomRecords,
+          saveMedicineNote,
+          deleteMedicineNote,
+          clearMedicineNotes,
+          saveWellnessPlan,
+          deleteWellnessPlan,
+          clearWellnessPlans,
+        },
+      })}
     </div>
   )
 }
 
-function renderPage(
-  page: PageId,
-  selectedFeature: (typeof features)[number] | undefined,
-  navigate: (page: PageId) => void,
-  symptomRecords: SavedSymptomRecord[],
-  medicineNotes: SavedMedicineNote[],
-  wellnessPlans: SavedWellnessPlan[],
-  saveSymptomRecord: (record: SaveSymptomRecordInput) => void,
-  deleteSymptomRecord: (id: string) => void,
-  clearSymptomRecords: () => void,
-  saveMedicineNote: (note: SaveMedicineNoteInput) => void,
-  deleteMedicineNote: (id: string) => void,
-  clearMedicineNotes: () => void,
-  saveWellnessPlan: (plan: SaveWellnessPlanInput) => void,
-  deleteWellnessPlan: (id: string) => void,
-  clearWellnessPlans: () => void,
-) {
+type PageActions = {
+  navigate: (page: PageId) => void
+  saveSymptomRecord: (record: SaveSymptomRecordInput) => void
+  deleteSymptomRecord: (id: string) => void
+  clearSymptomRecords: () => void
+  saveMedicineNote: (note: SaveMedicineNoteInput) => void
+  deleteMedicineNote: (id: string) => void
+  clearMedicineNotes: () => void
+  saveWellnessPlan: (plan: SaveWellnessPlanInput) => void
+  deleteWellnessPlan: (id: string) => void
+  clearWellnessPlans: () => void
+}
+
+type RenderPageParams = {
+  page: PageId
+  selectedFeature: (typeof features)[number] | undefined
+  symptomRecords: SavedSymptomRecord[]
+  medicineNotes: SavedMedicineNote[]
+  wellnessPlans: SavedWellnessPlan[]
+  actions: PageActions
+}
+
+function renderPage({
+  page,
+  selectedFeature,
+  symptomRecords,
+  medicineNotes,
+  wellnessPlans,
+  actions,
+}: RenderPageParams) {
   if (!selectedFeature || page === 'home') {
-    return <HomePage onNavigate={navigate} />
+    return <HomePage onNavigate={actions.navigate} />
   }
 
   if (page === 'symptom') {
     return (
       <SymptomPage
         feature={selectedFeature}
-        onNavigate={navigate}
-        onClearSymptomRecords={clearSymptomRecords}
-        onDeleteSymptomRecord={deleteSymptomRecord}
-        onSaveMedicineNote={saveMedicineNote}
-        onSaveSymptomRecord={saveSymptomRecord}
-        onSaveWellnessPlan={saveWellnessPlan}
+        onNavigate={actions.navigate}
+        onClearSymptomRecords={actions.clearSymptomRecords}
+        onDeleteSymptomRecord={actions.deleteSymptomRecord}
+        onSaveMedicineNote={actions.saveMedicineNote}
+        onSaveSymptomRecord={actions.saveSymptomRecord}
+        onSaveWellnessPlan={actions.saveWellnessPlan}
         savedRecords={symptomRecords}
       />
     )
@@ -200,9 +216,9 @@ function renderPage(
     return (
       <MedicinePage
         feature={selectedFeature}
-        onClearMedicineNotes={clearMedicineNotes}
-        onDeleteMedicineNote={deleteMedicineNote}
-        onNavigate={navigate}
+        onClearMedicineNotes={actions.clearMedicineNotes}
+        onDeleteMedicineNote={actions.deleteMedicineNote}
+        onNavigate={actions.navigate}
         savedNotes={medicineNotes}
       />
     )
@@ -212,24 +228,24 @@ function renderPage(
     return (
       <PreventivePage
         feature={selectedFeature}
-        onClearWellnessPlans={clearWellnessPlans}
-        onDeleteWellnessPlan={deleteWellnessPlan}
-        onNavigate={navigate}
+        onClearWellnessPlans={actions.clearWellnessPlans}
+        onDeleteWellnessPlan={actions.deleteWellnessPlan}
+        onNavigate={actions.navigate}
         savedPlans={wellnessPlans}
       />
     )
   }
 
   if (page === 'mental') {
-    return <MentalPage feature={selectedFeature} onNavigate={navigate} />
+    return <MentalPage feature={selectedFeature} onNavigate={actions.navigate} />
   }
 
   return (
     <ChatPage
       feature={selectedFeature}
-      onNavigate={navigate}
-      onSaveMedicineNote={saveMedicineNote}
-      onSaveWellnessPlan={saveWellnessPlan}
+      onNavigate={actions.navigate}
+      onSaveMedicineNote={actions.saveMedicineNote}
+      onSaveWellnessPlan={actions.saveWellnessPlan}
     />
   )
 }
@@ -250,4 +266,5 @@ function getInitialTheme(): ThemeMode {
 
   return 'light'
 }
+
 export default App
