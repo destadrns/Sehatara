@@ -10,7 +10,7 @@ function AssistantMessageBubble({ message }: { message: Extract<ChatMessage, { r
       <div className="assistant-bubble">
         <div className="bubble-title">
           <strong>{message.title}</strong>
-          <span>Sehatara</span>
+          <span>{message.source === 'gemini' ? 'Gemini API' : 'Sehatara'}</span>
         </div>
         <p>{message.body}</p>
         <ul>
@@ -22,6 +22,11 @@ function AssistantMessageBubble({ message }: { message: Extract<ChatMessage, { r
           <div className="bubble-alert">
             <AlertTriangle size={15} />
             <span>{message.warning}</span>
+          </div>
+        )}
+        {message.safetyMessage && (
+          <div className="bubble-safety">
+            <span>{message.safetyMessage}</span>
           </div>
         )}
         <div className="next-step">

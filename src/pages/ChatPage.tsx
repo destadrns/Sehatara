@@ -6,6 +6,9 @@ import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
 import { chatStarterPrompts } from '../data/chatData'
 import type {
+  AssistantMessage,
+  ChatAiResult,
+  ChatHistoryItem,
   ChatMessage,
   FeatureConfig,
   PageId,
@@ -13,6 +16,7 @@ import type {
   SaveWellnessPlanInput,
 } from '../types/sehatara'
 import { createId } from '../utils/assistantResponses'
+import { askGeminiChat, getGeminiChatErrorMessage } from '../utils/geminiChat'
 
 type ChatPageProps = {
   feature: FeatureConfig
@@ -30,14 +34,15 @@ function ChatPage({
   const [messages, setMessages] = useState<ChatMessage[]>(() => [createIntroMessage()])
   const [draft, setDraft] = useState('')
   const [isThinking, setIsThinking] = useState(false)
+  const [chatError, setChatError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
-  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')
+  const lastGeminiMessage = [...messages].reverse().find(isGeminiAssistantMessage)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, isThinking])
 
-  function submitChat(event: FormEvent<HTMLFormElement>) {
+  async function submitChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmedDraft = draft.trim()
 
@@ -45,39 +50,51 @@ function ChatPage({
       return
     }
 
-    setMessages((current) => [
-      ...current,
-      { id: createId(), role: 'user', body: trimmedDraft },
-    ])
+    const userMessage: ChatMessage = { id: createId(), role: 'user', body: trimmedDraft }
+    const nextMessages = [...messages, userMessage]
+
+    setMessages(nextMessages)
     setDraft('')
+    setChatError('')
     setIsThinking(true)
 
-    window.setTimeout(() => {
-      setMessages((current) => [...current, createChatResponse(trimmedDraft)])
+    try {
+      const result = await askGeminiChat({
+        message: trimmedDraft,
+        history: buildChatHistory(nextMessages),
+      })
+
+      setMessages((current) => [...current, createGeminiChatMessage(trimmedDraft, result)])
+    } catch (error) {
+      const message = getGeminiChatErrorMessage(error)
+      setChatError(message)
+      setMessages((current) => [...current, createChatErrorMessage(message)])
+    } finally {
       setIsThinking(false)
-    }, 520)
+    }
   }
 
   function resetChat() {
     setMessages([createIntroMessage()])
     setDraft('')
+    setChatError('')
   }
 
   function saveChatMedicineNote() {
-    if (!lastUserMessage || lastUserMessage.role !== 'user') {
+    if (!lastGeminiMessage) {
       return
     }
 
-    onSaveMedicineNote(createChatMedicineHandoff(lastUserMessage.body))
+    onSaveMedicineNote(createChatMedicineHandoff(lastGeminiMessage))
     onNavigate('medicine')
   }
 
   function saveChatWellnessPlan() {
-    if (!lastUserMessage || lastUserMessage.role !== 'user') {
+    if (!lastGeminiMessage) {
       return
     }
 
-    onSaveWellnessPlan(createChatWellnessHandoff(lastUserMessage.body))
+    onSaveWellnessPlan(createChatWellnessHandoff(lastGeminiMessage))
     onNavigate('preventive')
   }
 
@@ -99,7 +116,14 @@ function ChatPage({
 
           <div className="starter-row" aria-label="Contoh pertanyaan chat">
             {chatStarterPrompts.map((prompt) => (
-              <button key={prompt} onClick={() => setDraft(prompt)} type="button">
+              <button
+                key={prompt}
+                onClick={() => {
+                  setDraft(prompt)
+                  setChatError('')
+                }}
+                type="button"
+              >
                 {prompt}
               </button>
             ))}
@@ -139,11 +163,13 @@ function ChatPage({
               placeholder="Contoh: Apa yang perlu saya siapkan sebelum konsultasi ke dokter?"
               rows={4}
               value={draft}
+              disabled={isThinking}
             />
+            {chatError && <p className="form-alert">{chatError}</p>}
             <div className="composer-actions">
-              <span>Ruang ini untuk edukasi awal, bukan diagnosis atau resep.</span>
+              <span>Jawaban diambil dari Gemini API untuk edukasi awal, bukan diagnosis atau resep.</span>
               <button disabled={!draft.trim() || isThinking} type="submit">
-                Kirim
+                {isThinking ? 'Meminta Gemini...' : 'Kirim'}
                 <ArrowUp size={17} />
               </button>
             </div>
@@ -165,7 +191,7 @@ function ChatPage({
               atau latihan tenang, halaman khusus biasanya lebih enak dipakai.
             </p>
 
-            {lastUserMessage && lastUserMessage.role === 'user' && (
+            {lastGeminiMessage && !isThinking && (
               <div className="chat-handoff">
                 <span className="eyebrow">Bawa ke fitur lain</span>
                 <button className="handoff-mini medicine" onClick={saveChatMedicineNote} type="button">
@@ -203,49 +229,92 @@ function createIntroMessage(): ChatMessage {
   }
 }
 
-function createChatResponse(input: string): ChatMessage {
-  const compactInput = input.length > 110 ? `${input.slice(0, 110).trim()}...` : input
-
+function createGeminiChatMessage(input: string, result: ChatAiResult): AssistantMessage {
   return {
     id: createId(),
     role: 'assistant',
-    title: 'Saya bantu rapikan dulu',
-    body:
-      'Saya belum bisa memastikan diagnosis, tapi saya bisa membantu menjelaskan informasi awal dan hal yang sebaiknya kamu perhatikan.',
-    points: [
-      `Pertanyaanmu: "${compactInput}".`,
-      'Kalau ini terkait gejala, catat durasi, lokasi keluhan, tingkat rasa tidak nyaman, dan pemicunya.',
-      'Jika keluhan berat, memburuk cepat, atau muncul tanda bahaya, prioritaskan tenaga medis.',
-    ],
-    nextStep: 'Kalau mau, tambahkan durasi, usia umum, dan kondisi yang menyertai tanpa data identitas pribadi.',
+    title: result.title,
+    body: result.body,
+    points: result.points,
+    warning: result.warning,
+    nextStep: result.nextStep,
+    source: result.source,
+    relatedUserInput: input,
+    handoffSummary: result.handoffSummary,
+    medicineNote: result.medicineNote,
+    recoveryPlan: result.recoveryPlan,
+    safetyMessage: result.safetyMessage,
   }
 }
 
-function createChatMedicineHandoff(input: string): SaveMedicineNoteInput {
+function createChatErrorMessage(errorMessage: string): AssistantMessage {
+  return {
+    id: createId(),
+    role: 'assistant',
+    title: 'Gemini belum bisa menjawab',
+    body: errorMessage,
+    points: [
+      'Tidak ada jawaban AI yang dibuat untuk pertanyaan ini.',
+      'Pastikan API key, koneksi internet, dan server lokal masih aktif.',
+      'Kirim ulang pertanyaan setelah konfigurasi siap.',
+    ],
+    warning: 'Fitur Tanya AI membutuhkan respons Gemini agar hasilnya valid.',
+    nextStep: 'Coba kirim ulang setelah server dan Gemini API aktif.',
+  }
+}
+
+function buildChatHistory(messages: ChatMessage[]): ChatHistoryItem[] {
+  return messages.slice(-8).map((message) => {
+    if (message.role === 'user') {
+      return {
+        role: 'user',
+        text: message.body,
+      }
+    }
+
+    return {
+      role: 'assistant',
+      text: `${message.title}. ${message.body} ${message.points.join(' ')}`,
+    }
+  })
+}
+
+function isGeminiAssistantMessage(message: ChatMessage): message is AssistantMessage {
+  return message.role === 'assistant' && message.source === 'gemini'
+}
+
+function getHandoffContext(message: AssistantMessage) {
+  return (
+    message.handoffSummary ||
+    `${message.relatedUserInput ?? 'Pertanyaan chat'} ${message.body}`.trim()
+  )
+}
+
+function createChatMedicineHandoff(message: AssistantMessage): SaveMedicineNoteInput {
   return {
     source: 'Tanya AI',
-    title: 'Catatan obat dari pertanyaan chat',
-    context: input,
-    guidance: [
-      'Gunakan halaman ini untuk memahami kategori obat dan hal yang perlu dicek, bukan meminta resep.',
-      'Baca label obat, peringatan, interaksi, dan tanggal kedaluwarsa sebelum memakai obat bebas.',
-      'Jika sedang hamil, punya penyakit bawaan, alergi, atau memakai obat lain, tanyakan ke apoteker/dokter.',
-    ],
+    title: `Catatan obat dari ${message.title}`,
+    context: getHandoffContext(message),
+    guidance:
+      message.medicineNote && message.medicineNote.length > 0
+        ? message.medicineNote
+        : message.points,
     safety:
+      message.safetyMessage ||
+      message.warning ||
       'Sehatara tidak memberi dosis personal, merek wajib, atau keputusan mengganti obat dokter.',
   }
 }
 
-function createChatWellnessHandoff(input: string): SaveWellnessPlanInput {
+function createChatWellnessHandoff(message: AssistantMessage): SaveWellnessPlanInput {
   return {
     source: 'Tanya AI',
-    title: 'Rencana sehat dari pertanyaan chat',
-    context: input,
-    steps: [
-      'Pilih satu langkah kecil yang bisa dilakukan hari ini, bukan banyak target sekaligus.',
-      'Catat perubahan yang terasa setelah dilakukan selama 1-3 hari.',
-      'Jika keluhan memburuk atau terasa tidak wajar, prioritaskan konsultasi dengan tenaga kesehatan.',
-    ],
+    title: `Rencana sehat dari ${message.title}`,
+    context: getHandoffContext(message),
+    steps:
+      message.recoveryPlan && message.recoveryPlan.length > 0
+        ? message.recoveryPlan
+        : [message.nextStep, ...message.points.slice(0, 2)],
   }
 }
 

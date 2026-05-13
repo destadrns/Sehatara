@@ -1067,6 +1067,7 @@ input:focus-visible {
 }
 
 .bubble-alert,
+.bubble-safety,
 .next-step {
   display: flex;
   align-items: flex-start;
@@ -1080,6 +1081,13 @@ input:focus-visible {
 .bubble-alert {
   color: var(--clay);
   background: var(--clay-soft);
+}
+
+.bubble-safety {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-muted) 76%, transparent);
+  font-size: 0.88rem;
+  font-weight: 800;
 }
 
 .next-step {
@@ -1132,6 +1140,11 @@ input:focus-visible {
   color: var(--ink);
   background: var(--surface-strong);
   line-height: 1.58;
+}
+
+.feature-composer textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .composer-actions {

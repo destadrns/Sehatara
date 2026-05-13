@@ -1,6 +1,6 @@
 # Sehatara
 
-Sehatara adalah prototype web kesehatan awal untuk membantu pengguna merapikan keluhan, memahami catatan obat secara aman, menyusun rencana pulih ringan, dan bertanya melalui asisten AI.
+Sehatara adalah prototype web kesehatan awal untuk membantu pengguna merapikan keluhan, memahami catatan obat secara aman, menyusun rencana pulih ringan, dan bertanya melalui asisten AI berbasis Gemini.
 
 Project ini dibuat sebagai capstone dengan fokus pada pengalaman pengguna yang sederhana, responsif, dan mudah dipahami. Sehatara bukan alat diagnosis, bukan pengganti dokter, dan tidak memberikan resep atau dosis personal.
 
@@ -10,7 +10,7 @@ Project ini dibuat sebagai capstone dengan fokus pada pengalaman pengguna yang s
 - Catatan Obat: menyimpan catatan dari hasil gejala atau chat, lalu menampilkan checklist aman sebelum memahami obat.
 - Rencana Pulih: menyimpan saran perawatan ringan dan mengubahnya menjadi rencana kecil yang lebih mudah dijalani.
 - Ruang Tenang: latihan napas, grounding, dan dukungan awal untuk menenangkan diri.
-- Tanya Sehatara: ruang tanya umum untuk pertanyaan kesehatan awal.
+- Tanya Sehatara: ruang tanya umum berbasis Gemini untuk pertanyaan kesehatan awal.
 
 ## Teknologi
 
@@ -61,4 +61,4 @@ npm run build
 
 ## Catatan
 
-Sehatara masih berada pada tahap prototype. Integrasi Gemini saat ini difokuskan pada fitur Cerita Gejala. Untuk kebutuhan produksi, endpoint API perlu dipindahkan ke backend atau serverless function agar API key tidak terekspos di sisi client.
+Sehatara masih berada pada tahap prototype. Integrasi Gemini saat ini dipakai pada fitur Cerita Gejala dan Tanya Sehatara. Untuk kebutuhan produksi, endpoint API perlu dipindahkan ke backend atau serverless function agar API key tidak terekspos di sisi client.

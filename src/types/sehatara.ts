@@ -30,6 +30,12 @@ export type AssistantMessage = {
   points: string[]
   warning?: string
   nextStep: string
+  source?: AiResultSource
+  relatedUserInput?: string
+  handoffSummary?: string
+  medicineNote?: string[]
+  recoveryPlan?: string[]
+  safetyMessage?: string
 }
 
 export type UserMessage = {
@@ -66,6 +72,29 @@ export type SymptomAiResult = {
   doctorVisitAdvice: string[]
   medicineNote: string[]
   recoveryPlan: string[]
+  safetyMessage: string
+}
+
+export type ChatHistoryItem = {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+export type ChatAiInput = {
+  message: string
+  history: ChatHistoryItem[]
+}
+
+export type ChatAiResult = {
+  source: AiResultSource
+  title: string
+  body: string
+  points: string[]
+  warning?: string
+  nextStep: string
+  medicineNote: string[]
+  recoveryPlan: string[]
+  handoffSummary: string
   safetyMessage: string
 }
 
