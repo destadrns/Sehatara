@@ -111,6 +111,10 @@ function createGeminiErrorMessage(code: string) {
     return 'Request ke Gemini API gagal. Periksa apakah API key valid, model tersedia, dan akun Google AI Studio kamu aktif.'
   }
 
+  if (code === 'GEMINI_QUOTA_EXCEEDED') {
+    return 'Kuota Gemini API sedang habis atau terkena rate limit. Tunggu beberapa saat, lalu coba analisis ulang.'
+  }
+
   if (code === 'GEMINI_EMPTY_RESPONSE') {
     return 'Gemini API tidak mengirim hasil analisis. Coba ulangi atau cek konfigurasi model.'
   }

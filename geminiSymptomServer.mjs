@@ -41,8 +41,9 @@ export async function handleGeminiSymptomAnalysis(req, res, env = process.env) {
 
     if (!geminiResponse.ok) {
       const detail = await geminiResponse.text()
-      sendJson(res, 502, {
-        error: 'GEMINI_REQUEST_FAILED',
+      const failure = getGeminiRequestFailure(detail, geminiResponse.status)
+      sendJson(res, failure.statusCode, {
+        error: failure.error,
         detail: detail.slice(0, 500),
       })
       return
@@ -116,8 +117,9 @@ export async function handleGeminiChat(req, res, env = process.env) {
 
     if (!geminiResponse.ok) {
       const detail = await geminiResponse.text()
-      sendJson(res, 502, {
-        error: 'GEMINI_REQUEST_FAILED',
+      const failure = getGeminiRequestFailure(detail, geminiResponse.status)
+      sendJson(res, failure.statusCode, {
+        error: failure.error,
         detail: detail.slice(0, 500),
       })
       return
@@ -140,6 +142,24 @@ export async function handleGeminiChat(req, res, env = process.env) {
       error: 'GEMINI_PROXY_ERROR',
       detail: error instanceof Error ? error.message : 'Unknown error',
     })
+  }
+}
+
+function getGeminiRequestFailure(detail, status) {
+  if (
+    status === 429 ||
+    detail.includes('RESOURCE_EXHAUSTED') ||
+    detail.toLowerCase().includes('quota exceeded')
+  ) {
+    return {
+      statusCode: 429,
+      error: 'GEMINI_QUOTA_EXCEEDED',
+    }
+  }
+
+  return {
+    statusCode: 502,
+    error: 'GEMINI_REQUEST_FAILED',
   }
 }
 

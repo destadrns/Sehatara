@@ -1612,9 +1612,10 @@ input:focus-visible {
 .saved-plan-panel,
 .plan-card,
 .week-tracker,
-.breathing-card,
-.mood-scale,
-.grounding-card {
+.calm-mode-grid,
+.calm-session-card,
+.calm-history-card,
+.mood-scale {
   margin: 18px;
 }
 
@@ -1677,17 +1678,16 @@ input:focus-visible {
 .info-band,
 .plan-card,
 .week-tracker,
-.breathing-card,
-.mood-scale,
-.grounding-card {
+.calm-session-card,
+.calm-history-card,
+.mood-scale {
   border: 1px solid color-mix(in srgb, var(--line) 74%, transparent);
   border-radius: 20px;
   background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
 }
 
 .result-card,
-.info-band,
-.grounding-card {
+.info-band {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 12px;
@@ -1699,8 +1699,7 @@ input:focus-visible {
 }
 
 .result-card svg,
-.info-band svg,
-.grounding-card svg {
+.info-band svg {
   color: var(--sage);
 }
 
@@ -1716,9 +1715,7 @@ input:focus-visible {
 }
 
 .result-card p,
-.info-band p,
-.breathing-card p,
-.grounding-card p {
+.info-band p {
   margin: 0;
   color: var(--ink-soft);
   line-height: 1.6;
@@ -2823,9 +2820,7 @@ input:focus-visible {
 
 .plan-card h3,
 .week-tracker h3,
-.breathing-card h3,
 .mood-scale h3,
-.grounding-card h3,
 .progress-title {
   margin: 2px 0 0;
   font-size: 1.35rem;
@@ -2881,16 +2876,134 @@ input:focus-visible {
     color-mix(in srgb, var(--surface) 92%, transparent);
 }
 
-.breathing-card {
+.calm-mode-grid {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.calm-mode-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 74%, transparent);
+  border-radius: 18px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-strong) 86%, transparent);
+  text-align: left;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.calm-mode-card svg {
+  color: var(--violet);
+}
+
+.calm-mode-card span {
+  display: grid;
+  gap: 3px;
+}
+
+.calm-mode-card small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.calm-mode-card.active,
+.calm-mode-card:hover {
+  border-color: color-mix(in srgb, var(--violet) 52%, var(--line));
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--violet-soft) 42%, transparent), transparent 72%),
+    color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  box-shadow: var(--shadow-small);
+  transform: translateY(-1px);
+}
+
+.calm-session-card {
+  display: grid;
+  grid-template-columns: 124px minmax(0, 1fr) auto;
+  gap: 16px;
   align-items: center;
   padding: 18px;
 }
 
-.breathing-card > svg {
+.calm-session-visual {
+  display: grid;
+  width: 108px;
+  height: 108px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--violet) 28%, var(--line));
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--violet-soft) 64%, transparent), transparent 68%),
+    color-mix(in srgb, var(--surface-strong) 90%, transparent);
+}
+
+.calm-session-visual span {
   color: var(--violet);
+  font-size: 1.58rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.calm-session-visual small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.calm-session-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.calm-session-copy h3 {
+  margin: 0;
+  font-size: clamp(1.28rem, 2vw, 1.7rem);
+  line-height: 1.18;
+}
+
+.calm-session-copy p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.calm-progress-track {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 48%, transparent);
+}
+
+.calm-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--violet);
+  transition: width 220ms ease;
+}
+
+.calm-session-actions {
+  display: grid;
+  gap: 8px;
+  min-width: 132px;
+}
+
+.calm-session-actions .primary-button,
+.calm-session-actions .secondary-button {
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.calm-session-actions .secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .mood-scale input {
@@ -2908,8 +3021,41 @@ input:focus-visible {
   font-weight: 900;
 }
 
-.grounding-card svg {
-  color: var(--violet);
+.calm-history-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.calm-history-list {
+  display: grid;
+  gap: 9px;
+}
+
+.calm-history-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-muted) 74%, transparent);
+}
+
+.calm-history-item div {
+  display: grid;
+  gap: 4px;
+}
+
+.calm-history-item strong {
+  line-height: 1.25;
+}
+
+.calm-history-item span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .chat-workspace {
@@ -3182,9 +3328,10 @@ input:focus-visible {
   .saved-plan-panel,
   .plan-card,
   .week-tracker,
-  .breathing-card,
-  .mood-scale,
-  .grounding-card {
+  .calm-mode-grid,
+  .calm-session-card,
+  .calm-history-card,
+  .mood-scale {
     margin: 14px;
   }
 
@@ -3205,6 +3352,8 @@ input:focus-visible {
   .topic-detail-grid,
   .medicine-note-workspace,
   .wellness-plan-workspace,
+  .calm-mode-grid,
+  .calm-session-card,
   .habit-grid {
     grid-template-columns: 1fr;
   }
@@ -3218,8 +3367,15 @@ input:focus-visible {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .breathing-card {
-    grid-template-columns: 1fr;
+  .calm-session-visual {
+    width: 100%;
+    max-width: 160px;
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .calm-session-actions {
+    min-width: 0;
   }
 
   .conversation-panel {
@@ -3281,8 +3437,7 @@ input:focus-visible {
   .side-heading,
   .empty-result-state,
   .result-card,
-  .info-band,
-  .grounding-card {
+  .info-band {
     grid-template-columns: 1fr;
   }
 
@@ -3336,7 +3491,8 @@ input:focus-visible {
   .flag-grid,
   .result-meta-row,
   .handoff-card,
-  .handoff-mini {
+  .handoff-mini,
+  .calm-history-item {
     grid-template-columns: 1fr;
   }
 

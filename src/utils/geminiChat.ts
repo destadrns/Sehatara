@@ -113,6 +113,10 @@ function createGeminiChatErrorMessage(code: string) {
     return 'Request chat ke Gemini API gagal. Periksa API key, model, dan akun Google AI Studio.'
   }
 
+  if (code === 'GEMINI_QUOTA_EXCEEDED') {
+    return 'Kuota Gemini API sedang habis atau terkena rate limit. Tunggu beberapa saat, lalu coba kirim ulang.'
+  }
+
   if (code === 'GEMINI_EMPTY_RESPONSE') {
     return 'Gemini API tidak mengirim jawaban chat. Coba ulangi atau cek konfigurasi model.'
   }
