@@ -2061,6 +2061,149 @@ input:focus-visible {
   font-weight: 900;
 }
 
+.medicine-note-workspace {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.36fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.medicine-note-list {
+  display: grid;
+  gap: 8px;
+}
+
+.medicine-note-select {
+  display: grid;
+  gap: 8px;
+  min-height: 116px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 16px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  text-align: left;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.medicine-note-select.active,
+.medicine-note-select:hover {
+  border-color: color-mix(in srgb, var(--teal) 52%, var(--line));
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--teal-soft) 34%, transparent), transparent 72%),
+    color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  box-shadow: var(--shadow-small);
+  transform: translateY(-1px);
+}
+
+.medicine-note-select-header,
+.medicine-note-progress-row,
+.medicine-note-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.medicine-note-select-header {
+  justify-content: space-between;
+}
+
+.medicine-note-select strong {
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.medicine-note-select small {
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.checked-stamp {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--teal);
+  background: var(--teal-soft);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.medicine-note-detail {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+}
+
+.medicine-note-progress-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface-muted) 76%, transparent);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.medicine-note-progress-row svg {
+  color: var(--teal);
+}
+
+.medicine-understanding-list {
+  display: grid;
+  gap: 8px;
+}
+
+.personal-note-field {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.personal-note-field textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 16px;
+  color: var(--ink);
+  background: var(--surface-strong);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.personal-note-field small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.medicine-note-actions {
+  justify-content: space-between;
+}
+
+.medicine-note-actions .primary-button,
+.medicine-note-actions .secondary-button {
+  min-height: 40px;
+  padding: 0 13px;
+}
+
 .saved-panel-heading {
   display: grid;
   gap: 4px;
@@ -2918,6 +3061,7 @@ input:focus-visible {
   .form-grid,
   .topic-grid,
   .topic-detail-grid,
+  .medicine-note-workspace,
   .habit-grid {
     grid-template-columns: 1fr;
   }
@@ -2947,6 +3091,16 @@ input:focus-visible {
 
   .composer-actions button {
     justify-content: center;
+    width: 100%;
+  }
+
+  .medicine-note-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .medicine-note-actions .primary-button,
+  .medicine-note-actions .secondary-button {
     width: 100%;
   }
 

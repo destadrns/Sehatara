@@ -1,6 +1,8 @@
 import {
+  Check,
   CheckCircle2,
   ClipboardCheck,
+  FileText,
   History,
   MessageCircle,
   Pill,
@@ -8,7 +10,7 @@ import {
   ShieldAlert,
   Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
 import { medicineChecklist, medicineTopics } from '../data/medicineData'
@@ -22,6 +24,14 @@ type MedicinePageProps = {
   savedNotes: SavedMedicineNote[]
 }
 
+type MedicineNoteProgress = {
+  understood: string[]
+  personalNote: string
+  checkedAt?: string
+}
+
+const MEDICINE_NOTE_PROGRESS_KEY = 'sehatara-medicine-note-progress'
+
 function MedicinePage({
   feature,
   onClearMedicineNotes,
@@ -34,10 +44,53 @@ function MedicinePage({
   const [checkedTopicItems, setCheckedTopicItems] = useState<Record<string, string[]>>({})
   const [showSavedNotes, setShowSavedNotes] = useState(false)
   const [confirmClearNotes, setConfirmClearNotes] = useState(false)
+  const [activeSavedNoteId, setActiveSavedNoteId] = useState(savedNotes[0]?.id ?? '')
+  const [noteProgressById, setNoteProgressById] = useState<Record<string, MedicineNoteProgress>>(
+    readMedicineNoteProgress,
+  )
   const topic = medicineTopics.find((item) => item.id === activeTopic) ?? medicineTopics[0]
   const checkedItems = checkedTopicItems[topic.id] ?? []
   const topicProgress = `${checkedItems.length}/${topic.checklist.length}`
   const latestSavedNote = savedNotes[0]
+  const activeSavedNote = useMemo(
+    () => savedNotes.find((note) => note.id === activeSavedNoteId) ?? latestSavedNote,
+    [activeSavedNoteId, latestSavedNote, savedNotes],
+  )
+  const activeSavedNoteChecklist = useMemo(
+    () => (activeSavedNote ? getSavedNoteChecklist(activeSavedNote) : []),
+    [activeSavedNote],
+  )
+  const activeSavedNoteProgress = activeSavedNote
+    ? noteProgressById[activeSavedNote.id] ?? createEmptyMedicineNoteProgress()
+    : createEmptyMedicineNoteProgress()
+  const activeUnderstoodCount = activeSavedNoteChecklist.filter((item) =>
+    activeSavedNoteProgress.understood.includes(item),
+  ).length
+
+  useEffect(() => {
+    window.localStorage.setItem(MEDICINE_NOTE_PROGRESS_KEY, JSON.stringify(noteProgressById))
+  }, [noteProgressById])
+
+  useEffect(() => {
+    const validIds = new Set(savedNotes.map((note) => note.id))
+
+    setNoteProgressById((current) => {
+      const nextEntries = Object.entries(current).filter(([id]) => validIds.has(id))
+
+      if (nextEntries.length === Object.keys(current).length) {
+        return current
+      }
+
+      return Object.fromEntries(nextEntries)
+    })
+
+    setActiveSavedNoteId((current) => (current && validIds.has(current) ? current : savedNotes[0]?.id ?? ''))
+
+    if (savedNotes.length === 0) {
+      setShowSavedNotes(false)
+      setConfirmClearNotes(false)
+    }
+  }, [savedNotes])
 
   function toggleTopicItem(item: string) {
     setCheckedTopicItems((current) => {
@@ -55,8 +108,62 @@ function MedicinePage({
 
   function handleClearMedicineNotes() {
     onClearMedicineNotes()
+    setNoteProgressById({})
+    setActiveSavedNoteId('')
     setConfirmClearNotes(false)
     setShowSavedNotes(false)
+  }
+
+  function openSavedNote(noteId: string) {
+    setActiveSavedNoteId(noteId)
+    setShowSavedNotes(true)
+    setConfirmClearNotes(false)
+  }
+
+  function deleteSavedNote(noteId: string) {
+    onDeleteMedicineNote(noteId)
+    setNoteProgressById((current) => {
+      const remaining = { ...current }
+      delete remaining[noteId]
+      return remaining
+    })
+  }
+
+  function updateSavedNoteProgress(
+    noteId: string,
+    updater: (progress: MedicineNoteProgress) => MedicineNoteProgress,
+  ) {
+    setNoteProgressById((current) => ({
+      ...current,
+      [noteId]: updater(current[noteId] ?? createEmptyMedicineNoteProgress()),
+    }))
+  }
+
+  function toggleUnderstoodItem(noteId: string, item: string) {
+    updateSavedNoteProgress(noteId, (progress) => {
+      const understood = progress.understood.includes(item)
+        ? progress.understood.filter((checkedItem) => checkedItem !== item)
+        : [...progress.understood, item]
+
+      return {
+        ...progress,
+        understood,
+      }
+    })
+  }
+
+  function updatePersonalNote(noteId: string, personalNote: string) {
+    updateSavedNoteProgress(noteId, (progress) => ({
+      ...progress,
+      personalNote,
+    }))
+  }
+
+  function toggleCheckedStatus(noteId: string) {
+    updateSavedNoteProgress(noteId, (progress) => ({
+      ...progress,
+      checkedAt: progress.checkedAt ? undefined : new Date().toISOString(),
+    }))
   }
 
   return (
@@ -120,7 +227,7 @@ function MedicinePage({
               {!showSavedNotes && latestSavedNote && (
                 <button
                   className="saved-summary-card"
-                  onClick={() => setShowSavedNotes(true)}
+                  onClick={() => openSavedNote(latestSavedNote.id)}
                   type="button"
                 >
                   <span className="saved-summary-meta">
@@ -153,41 +260,119 @@ function MedicinePage({
               )}
 
               {showSavedNotes && (
-                <div className="saved-note-list">
-                  {savedNotes.map((note) => (
-                    <article className="saved-note-card readable-saved-card" key={note.id}>
+                <div className="medicine-note-workspace">
+                  <div className="medicine-note-list" aria-label="Daftar catatan obat tersimpan">
+                    {savedNotes.map((note) => {
+                      const checklist = getSavedNoteChecklist(note)
+                      const progress = noteProgressById[note.id] ?? createEmptyMedicineNoteProgress()
+                      const understoodCount = checklist.filter((item) => progress.understood.includes(item)).length
+                      const active = activeSavedNote?.id === note.id
+
+                      return (
+                        <button
+                          aria-pressed={active}
+                          className={active ? 'medicine-note-select active' : 'medicine-note-select'}
+                          key={note.id}
+                          onClick={() => openSavedNote(note.id)}
+                          type="button"
+                        >
+                          <span className="medicine-note-select-header">
+                            <span className="source-pill">{note.source}</span>
+                            {progress.checkedAt && <span className="checked-stamp">Sudah dicek</span>}
+                          </span>
+                          <strong>{note.title}</strong>
+                          <small>{understoodCount}/{checklist.length} dipahami</small>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {activeSavedNote && (
+                    <article className="medicine-note-detail readable-saved-card">
                       <div className="saved-card-header saved-card-header-row">
                         <div className="saved-card-title">
-                          <span className="source-pill">{note.source}</span>
-                          <strong>{note.title}</strong>
+                          <span className="source-pill">{activeSavedNote.source}</span>
+                          <strong>{activeSavedNote.title}</strong>
                         </div>
                         <button
-                          aria-label={`Hapus catatan ${note.title}`}
+                          aria-label={`Hapus catatan ${activeSavedNote.title}`}
                           className="icon-action tiny-danger"
-                          onClick={() => onDeleteMedicineNote(note.id)}
+                          onClick={() => deleteSavedNote(activeSavedNote.id)}
                           type="button"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
 
+                      <div className="medicine-note-progress-row">
+                        <span>
+                          <CheckCircle2 size={15} />
+                          {activeUnderstoodCount}/{activeSavedNoteChecklist.length} dipahami
+                        </span>
+                        <span>
+                          <FileText size={15} />
+                          {activeSavedNoteProgress.personalNote.trim() ? 'Ada catatan pribadi' : 'Belum ada catatan pribadi'}
+                        </span>
+                      </div>
+
                       <div className="saved-context-block">
                         <span>Konteks singkat</span>
-                        <p>{note.context}</p>
+                        <p>{activeSavedNote.context}</p>
                       </div>
 
                       <div className="saved-readable-section">
-                        <span>Yang perlu dipahami</span>
-                        <ul className="readable-check-list">
-                          {note.guidance.map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
+                        <span>Checklist pemahaman</span>
+                        <div className="medicine-understanding-list">
+                          {activeSavedNoteChecklist.map((item) => {
+                            const checked = activeSavedNoteProgress.understood.includes(item)
+
+                            return (
+                              <button
+                                aria-pressed={checked}
+                                className={checked ? 'check-row active' : 'check-row'}
+                                key={item}
+                                onClick={() => toggleUnderstoodItem(activeSavedNote.id, item)}
+                                type="button"
+                              >
+                                <span>{checked && <Check size={14} />}</span>
+                                {item}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
 
-                      <p className="saved-safety-note">{note.safety}</p>
+                      <label className="personal-note-field" htmlFor={`personal-note-${activeSavedNote.id}`}>
+                        <span>Catatan pribadi sederhana</span>
+                        <textarea
+                          id={`personal-note-${activeSavedNote.id}`}
+                          onChange={(event) => updatePersonalNote(activeSavedNote.id, event.target.value)}
+                          placeholder="Contoh: tanyakan ke apoteker karena sedang minum obat lain..."
+                          rows={3}
+                          value={activeSavedNoteProgress.personalNote}
+                        />
+                        <small>Tersimpan otomatis di perangkat ini.</small>
+                      </label>
+
+                      <div className="medicine-note-actions">
+                        <button
+                          className={activeSavedNoteProgress.checkedAt ? 'secondary-button' : 'primary-button'}
+                          onClick={() => toggleCheckedStatus(activeSavedNote.id)}
+                          type="button"
+                        >
+                          <CheckCircle2 size={16} />
+                          {activeSavedNoteProgress.checkedAt ? 'Batalkan sudah dicek' : 'Tandai sudah dicek'}
+                        </button>
+                        {activeSavedNoteProgress.checkedAt && (
+                          <span className="checked-stamp">
+                            Dicek {formatMedicineCheckedTime(activeSavedNoteProgress.checkedAt)}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="saved-safety-note">{activeSavedNote.safety}</p>
                     </article>
-                  ))}
+                  )}
                 </div>
               )}
             </section>
@@ -316,6 +501,92 @@ function MedicinePage({
       </section>
     </main>
   )
+}
+
+function createEmptyMedicineNoteProgress(): MedicineNoteProgress {
+  return {
+    understood: [],
+    personalNote: '',
+  }
+}
+
+function readMedicineNoteProgress(): Record<string, MedicineNoteProgress> {
+  const stored = window.localStorage.getItem(MEDICINE_NOTE_PROGRESS_KEY)
+
+  if (!stored) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(stored)
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+
+    return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, MedicineNoteProgress>>(
+      (progressMap, [id, value]) => {
+        const progress = normalizeMedicineNoteProgress(value)
+
+        if (progress) {
+          progressMap[id] = progress
+        }
+
+        return progressMap
+      },
+      {},
+    )
+  } catch {
+    return {}
+  }
+}
+
+function normalizeMedicineNoteProgress(value: unknown): MedicineNoteProgress | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  const progress = value as Record<string, unknown>
+  const understood = Array.isArray(progress.understood)
+    ? progress.understood
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : []
+  const personalNote = typeof progress.personalNote === 'string' ? progress.personalNote : ''
+  const checkedAt =
+    typeof progress.checkedAt === 'string' && !Number.isNaN(new Date(progress.checkedAt).getTime())
+      ? progress.checkedAt
+      : undefined
+
+  return {
+    understood,
+    personalNote,
+    checkedAt,
+  }
+}
+
+function getSavedNoteChecklist(note: SavedMedicineNote) {
+  return [
+    ...note.guidance,
+    'Saya paham catatan ini bukan resep atau dosis personal.',
+    'Saya tahu kapan perlu bertanya ke apoteker atau dokter.',
+  ]
+}
+
+function formatMedicineCheckedTime(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'baru saja'
+  }
+
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
 }
 
 export default MedicinePage
