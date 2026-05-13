@@ -25,22 +25,29 @@ type ChatPageProps = {
   onSaveWellnessPlan: (plan: SaveWellnessPlanInput) => void
 }
 
+const CHAT_SESSION_KEY = 'sehatara-chat-session'
+
 function ChatPage({
   feature,
   onNavigate,
   onSaveMedicineNote,
   onSaveWellnessPlan,
 }: ChatPageProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [createIntroMessage()])
+  const [messages, setMessages] = useState<ChatMessage[]>(readStoredChatMessages)
   const [draft, setDraft] = useState('')
   const [isThinking, setIsThinking] = useState(false)
   const [chatError, setChatError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const lastGeminiMessage = [...messages].reverse().find(isGeminiAssistantMessage)
+  const hasActiveSession = messages.some((message) => message.role === 'user' || message.source === 'gemini')
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, isThinking])
+
+  useEffect(() => {
+    window.localStorage.setItem(CHAT_SESSION_KEY, JSON.stringify(messages))
+  }, [messages])
 
   async function submitChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -61,7 +68,7 @@ function ChatPage({
     try {
       const result = await askGeminiChat({
         message: trimmedDraft,
-        history: buildChatHistory(nextMessages),
+        history: buildChatHistory(messages),
       })
 
       setMessages((current) => [...current, createGeminiChatMessage(trimmedDraft, result)])
@@ -74,7 +81,7 @@ function ChatPage({
     }
   }
 
-  function resetChat() {
+  function startNewChat() {
     setMessages([createIntroMessage()])
     setDraft('')
     setChatError('')
@@ -109,9 +116,18 @@ function ChatPage({
               <span className="eyebrow">Ruang chat khusus</span>
               <h2>Tanya Sehatara</h2>
             </div>
-            <button className="icon-action" onClick={resetChat} title="Reset chat" type="button">
-              <RotateCcw size={18} />
-            </button>
+            <div className="chat-toolbar-actions">
+              {hasActiveSession && <span className="soft-status">Sesi tersimpan</span>}
+              <button
+                className="text-button compact-button"
+                disabled={isThinking}
+                onClick={startNewChat}
+                type="button"
+              >
+                <RotateCcw size={15} />
+                Chat baru
+              </button>
+            </div>
           </div>
 
           <div className="starter-row" aria-label="Contoh pertanyaan chat">
@@ -187,8 +203,8 @@ function ChatPage({
               </div>
             </div>
             <p className="muted-copy">
-              Gunakan chat untuk pertanyaan umum. Untuk gejala, obat, kebiasaan sehat,
-              atau latihan tenang, halaman khusus biasanya lebih enak dipakai.
+              Gunakan chat untuk pertanyaan umum. Percakapan terakhir tetap tersimpan di perangkat ini
+              saat kamu pindah fitur. Pakai Chat baru kalau ingin mulai dari awal.
             </p>
 
             {lastGeminiMessage && !isThinking && (
@@ -227,6 +243,95 @@ function createIntroMessage(): ChatMessage {
     ],
     nextStep: 'Pilih contoh pertanyaan atau tulis pertanyaanmu sendiri.',
   }
+}
+
+function readStoredChatMessages(): ChatMessage[] {
+  const stored = window.localStorage.getItem(CHAT_SESSION_KEY)
+
+  if (!stored) {
+    return [createIntroMessage()]
+  }
+
+  try {
+    const parsed = JSON.parse(stored)
+
+    if (!Array.isArray(parsed)) {
+      return [createIntroMessage()]
+    }
+
+    const restoredMessages = parsed
+      .map((item): ChatMessage | null => normalizeStoredChatMessage(item))
+      .filter((item): item is ChatMessage => Boolean(item))
+
+    return restoredMessages.length > 0 ? restoredMessages : [createIntroMessage()]
+  } catch {
+    return [createIntroMessage()]
+  }
+}
+
+function normalizeStoredChatMessage(value: unknown): ChatMessage | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const message = value as Record<string, unknown>
+  const id = typeof message.id === 'string' && message.id ? message.id : createId()
+
+  if (message.role === 'user') {
+    const body = normalizeStoredText(message.body)
+
+    return body
+      ? {
+          id,
+          role: 'user',
+          body,
+        }
+      : null
+  }
+
+  if (message.role !== 'assistant') {
+    return null
+  }
+
+  const points = normalizeStoredStringList(message.points)
+  const title = normalizeStoredText(message.title)
+  const body = normalizeStoredText(message.body)
+  const nextStep = normalizeStoredText(message.nextStep)
+
+  if (!title || !body || points.length === 0 || !nextStep) {
+    return null
+  }
+
+  return {
+    id,
+    role: 'assistant',
+    title,
+    body,
+    points,
+    warning: normalizeStoredText(message.warning),
+    nextStep,
+    source: message.source === 'gemini' ? 'gemini' : undefined,
+    relatedUserInput: normalizeStoredText(message.relatedUserInput),
+    handoffSummary: normalizeStoredText(message.handoffSummary),
+    medicineNote: normalizeOptionalStoredStringList(message.medicineNote),
+    recoveryPlan: normalizeOptionalStoredStringList(message.recoveryPlan),
+    safetyMessage: normalizeStoredText(message.safetyMessage),
+  }
+}
+
+function normalizeStoredText(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function normalizeStoredStringList(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
+    : []
+}
+
+function normalizeOptionalStoredStringList(value: unknown) {
+  const list = normalizeStoredStringList(value)
+  return list.length > 0 ? list : undefined
 }
 
 function createGeminiChatMessage(input: string, result: ChatAiResult): AssistantMessage {
