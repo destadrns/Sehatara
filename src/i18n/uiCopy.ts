@@ -29,6 +29,7 @@ export const uiCopy = {
       title: 'Tulis ceritamu. Sehatara bantu rapikan.',
       body:
         'Sehatara membantu kamu memahami gejala, obat, kebiasaan sehat, dan kondisi mental ringan dengan bahasa yang lebih dekat. Tetap edukatif, tetap hati-hati, dan tidak menggantikan dokter.',
+      microcopyAria: 'Karakter Sehatara',
       microcopy: ['Bahasa sehari-hari', 'Jawaban ringkas', 'Ada batas aman'],
       primaryAction: 'Ceritakan gejala',
       secondaryAction: 'Buka catatan obat',
@@ -333,6 +334,7 @@ export const uiCopy = {
       title: 'Write your story. Sehatara helps organize it.',
       body:
         'Sehatara helps you understand symptoms, medicine notes, healthy habits, and mild mental wellness needs in friendlier language. It stays educational, careful, and does not replace a doctor.',
+      microcopyAria: 'Sehatara character',
       microcopy: ['Everyday language', 'Concise answers', 'Clear safety limits'],
       primaryAction: 'Tell symptoms',
       secondaryAction: 'Open medicine notes',

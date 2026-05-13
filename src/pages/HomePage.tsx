@@ -28,7 +28,7 @@ function HomePage({ features, language, onNavigate }: HomePageProps) {
           <span className="eyebrow">{copy.heroEyebrow}</span>
           <h1>{copy.title}</h1>
           <p>{copy.body}</p>
-          <div className="hero-microcopy" aria-label={language === 'en' ? 'Sehatara character' : 'Karakter Sehatara'}>
+          <div className="hero-microcopy" aria-label={copy.microcopyAria}>
             {copy.microcopy.map((item) => (
               <span key={item}>{item}</span>
             ))}
