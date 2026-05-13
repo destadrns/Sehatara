@@ -1,5 +1,5 @@
-import { CalendarDays, Check, ClipboardCheck, History, Leaf, RotateCcw, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { CalendarDays, Check, CheckCircle2, ClipboardCheck, History, Leaf, RotateCcw, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
 import { habitFocusOptions, weeklyRhythm } from '../data/preventiveData'
@@ -13,6 +13,13 @@ type PreventivePageProps = {
   savedPlans: SavedWellnessPlan[]
 }
 
+type WellnessPlanProgress = {
+  completedSteps: string[]
+  completedDays: string[]
+}
+
+const WELLNESS_PLAN_PROGRESS_KEY = 'sehatara-wellness-plan-progress'
+
 function PreventivePage({
   feature,
   onClearWellnessPlans,
@@ -25,9 +32,51 @@ function PreventivePage({
   const [completedHabitSteps, setCompletedHabitSteps] = useState<Record<string, string[]>>({})
   const [showSavedPlans, setShowSavedPlans] = useState(false)
   const [confirmClearPlans, setConfirmClearPlans] = useState(false)
+  const [activeSavedPlanId, setActiveSavedPlanId] = useState(savedPlans[0]?.id ?? '')
+  const [planProgressById, setPlanProgressById] = useState<Record<string, WellnessPlanProgress>>(
+    readWellnessPlanProgress,
+  )
   const habit = habitFocusOptions.find((item) => item.id === activeHabit) ?? habitFocusOptions[0]
   const completedSteps = completedHabitSteps[habit.id] ?? []
   const latestSavedPlan = savedPlans[0]
+  const activeSavedPlan = useMemo(
+    () => savedPlans.find((plan) => plan.id === activeSavedPlanId) ?? latestSavedPlan,
+    [activeSavedPlanId, latestSavedPlan, savedPlans],
+  )
+  const activeSavedPlanProgress = activeSavedPlan
+    ? planProgressById[activeSavedPlan.id] ?? createEmptyWellnessPlanProgress()
+    : createEmptyWellnessPlanProgress()
+  const activePlanCompletedSteps = activeSavedPlan
+    ? activeSavedPlan.steps.filter((step) => activeSavedPlanProgress.completedSteps.includes(step)).length
+    : 0
+  const activePlanCompletedDays = weeklyRhythm.filter((day) =>
+    activeSavedPlanProgress.completedDays.includes(day),
+  ).length
+
+  useEffect(() => {
+    window.localStorage.setItem(WELLNESS_PLAN_PROGRESS_KEY, JSON.stringify(planProgressById))
+  }, [planProgressById])
+
+  useEffect(() => {
+    const validIds = new Set(savedPlans.map((plan) => plan.id))
+
+    setPlanProgressById((current) => {
+      const nextEntries = Object.entries(current).filter(([id]) => validIds.has(id))
+
+      if (nextEntries.length === Object.keys(current).length) {
+        return current
+      }
+
+      return Object.fromEntries(nextEntries)
+    })
+
+    setActiveSavedPlanId((current) => (current && validIds.has(current) ? current : savedPlans[0]?.id ?? ''))
+
+    if (savedPlans.length === 0) {
+      setShowSavedPlans(false)
+      setConfirmClearPlans(false)
+    }
+  }, [savedPlans])
 
   function toggleDay(day: string) {
     setCheckedDays((current) =>
@@ -58,8 +107,68 @@ function PreventivePage({
 
   function handleClearWellnessPlans() {
     onClearWellnessPlans()
+    setPlanProgressById({})
+    setActiveSavedPlanId('')
     setConfirmClearPlans(false)
     setShowSavedPlans(false)
+  }
+
+  function openSavedPlan(planId: string) {
+    setActiveSavedPlanId(planId)
+    setShowSavedPlans(true)
+    setConfirmClearPlans(false)
+  }
+
+  function deleteSavedPlan(planId: string) {
+    onDeleteWellnessPlan(planId)
+    setPlanProgressById((current) => {
+      const remaining = { ...current }
+      delete remaining[planId]
+      return remaining
+    })
+  }
+
+  function updateSavedPlanProgress(
+    planId: string,
+    updater: (progress: WellnessPlanProgress) => WellnessPlanProgress,
+  ) {
+    setPlanProgressById((current) => ({
+      ...current,
+      [planId]: updater(current[planId] ?? createEmptyWellnessPlanProgress()),
+    }))
+  }
+
+  function toggleSavedPlanStep(planId: string, step: string) {
+    updateSavedPlanProgress(planId, (progress) => {
+      const completedSteps = progress.completedSteps.includes(step)
+        ? progress.completedSteps.filter((item) => item !== step)
+        : [...progress.completedSteps, step]
+
+      return {
+        ...progress,
+        completedSteps,
+      }
+    })
+  }
+
+  function toggleSavedPlanDay(planId: string, day: string) {
+    updateSavedPlanProgress(planId, (progress) => {
+      const completedDays = progress.completedDays.includes(day)
+        ? progress.completedDays.filter((item) => item !== day)
+        : [...progress.completedDays, day]
+
+      return {
+        ...progress,
+        completedDays,
+      }
+    })
+  }
+
+  function resetSavedPlanProgress(planId: string) {
+    setPlanProgressById((current) => ({
+      ...current,
+      [planId]: createEmptyWellnessPlanProgress(),
+    }))
   }
 
   return (
@@ -174,7 +283,7 @@ function PreventivePage({
               {!showSavedPlans && latestSavedPlan && (
                 <button
                   className="saved-summary-card wellness-summary-card"
-                  onClick={() => setShowSavedPlans(true)}
+                  onClick={() => openSavedPlan(latestSavedPlan.id)}
                   type="button"
                 >
                   <span className="saved-summary-meta">
@@ -207,39 +316,132 @@ function PreventivePage({
               )}
 
               {showSavedPlans && (
-                <div className="saved-plan-list">
-                  {savedPlans.map((plan) => (
-                    <article className="saved-plan-card readable-saved-card" key={plan.id}>
+                <div className="wellness-plan-workspace">
+                  <div className="wellness-plan-list" aria-label="Daftar rencana pulih tersimpan">
+                    {savedPlans.map((plan) => {
+                      const progress = planProgressById[plan.id] ?? createEmptyWellnessPlanProgress()
+                      const completedStepCount = plan.steps.filter((step) =>
+                        progress.completedSteps.includes(step),
+                      ).length
+                      const completedDayCount = weeklyRhythm.filter((day) =>
+                        progress.completedDays.includes(day),
+                      ).length
+                      const active = activeSavedPlan?.id === plan.id
+
+                      return (
+                        <button
+                          aria-pressed={active}
+                          className={active ? 'wellness-plan-select active' : 'wellness-plan-select'}
+                          key={plan.id}
+                          onClick={() => openSavedPlan(plan.id)}
+                          type="button"
+                        >
+                          <span className="wellness-plan-select-header">
+                            <span className="source-pill">{plan.source}</span>
+                            {completedDayCount >= 7 && <span className="wellness-stamp">7 hari lengkap</span>}
+                          </span>
+                          <strong>{plan.title}</strong>
+                          <small>{completedStepCount}/{plan.steps.length} langkah, {completedDayCount}/7 hari</small>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {activeSavedPlan && (
+                    <article className="wellness-plan-detail readable-saved-card">
                       <div className="saved-card-header saved-card-header-row">
                         <div className="saved-card-title">
-                          <span className="source-pill">{plan.source}</span>
-                          <strong>{plan.title}</strong>
+                          <span className="source-pill">{activeSavedPlan.source}</span>
+                          <strong>{activeSavedPlan.title}</strong>
                         </div>
                         <button
-                          aria-label={`Hapus rencana ${plan.title}`}
+                          aria-label={`Hapus rencana ${activeSavedPlan.title}`}
                           className="icon-action tiny-danger"
-                          onClick={() => onDeleteWellnessPlan(plan.id)}
+                          onClick={() => deleteSavedPlan(activeSavedPlan.id)}
                           type="button"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
 
+                      <div className="wellness-plan-progress-row">
+                        <span>
+                          <CheckCircle2 size={15} />
+                          {activePlanCompletedSteps}/{activeSavedPlan.steps.length} langkah
+                        </span>
+                        <span>
+                          <CalendarDays size={15} />
+                          {activePlanCompletedDays}/7 hari
+                        </span>
+                      </div>
+
                       <div className="saved-context-block">
                         <span>Konteks singkat</span>
-                        <p>{plan.context}</p>
+                        <p>{activeSavedPlan.context}</p>
                       </div>
 
                       <div className="saved-readable-section">
-                        <span>Rencana sederhana</span>
-                        <ol className="readable-step-list">
-                          {plan.steps.map((step) => (
-                            <li key={step}>{step}</li>
-                          ))}
-                        </ol>
+                        <span>Checklist langkah</span>
+                        <div className="wellness-step-list">
+                          {activeSavedPlan.steps.map((step) => {
+                            const checked = activeSavedPlanProgress.completedSteps.includes(step)
+
+                            return (
+                              <button
+                                aria-pressed={checked}
+                                className={checked ? 'check-row active' : 'check-row'}
+                                key={step}
+                                onClick={() => toggleSavedPlanStep(activeSavedPlan.id, step)}
+                                type="button"
+                              >
+                                <span>{checked && <Check size={14} />}</span>
+                                {step}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      <section className="wellness-day-section">
+                        <div>
+                          <span>Progress 7 hari</span>
+                          <p>Tandai hari ketika kamu berhasil menjalankan minimal satu langkah.</p>
+                        </div>
+                        <div className="day-grid wellness-day-grid">
+                          {weeklyRhythm.map((day) => {
+                            const active = activeSavedPlanProgress.completedDays.includes(day)
+
+                            return (
+                              <button
+                                aria-pressed={active}
+                                className={active ? 'day-chip active' : 'day-chip'}
+                                key={day}
+                                onClick={() => toggleSavedPlanDay(activeSavedPlan.id, day)}
+                                type="button"
+                              >
+                                {active && <Check size={14} />}
+                                {day}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </section>
+
+                      <div className="wellness-plan-actions">
+                        <button
+                          className="secondary-button"
+                          onClick={() => resetSavedPlanProgress(activeSavedPlan.id)}
+                          type="button"
+                        >
+                          <RotateCcw size={16} />
+                          Reset progress
+                        </button>
+                        {activePlanCompletedDays >= 7 && (
+                          <span className="wellness-stamp">Rencana 7 hari selesai</span>
+                        )}
                       </div>
                     </article>
-                  ))}
+                  )}
                 </div>
               )}
             </section>
@@ -301,6 +503,66 @@ function PreventivePage({
       </section>
     </main>
   )
+}
+
+function createEmptyWellnessPlanProgress(): WellnessPlanProgress {
+  return {
+    completedSteps: [],
+    completedDays: [],
+  }
+}
+
+function readWellnessPlanProgress(): Record<string, WellnessPlanProgress> {
+  const stored = window.localStorage.getItem(WELLNESS_PLAN_PROGRESS_KEY)
+
+  if (!stored) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(stored)
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+
+    return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, WellnessPlanProgress>>(
+      (progressMap, [id, value]) => {
+        const progress = normalizeWellnessPlanProgress(value)
+
+        if (progress) {
+          progressMap[id] = progress
+        }
+
+        return progressMap
+      },
+      {},
+    )
+  } catch {
+    return {}
+  }
+}
+
+function normalizeWellnessPlanProgress(value: unknown): WellnessPlanProgress | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  const progress = value as Record<string, unknown>
+
+  return {
+    completedSteps: normalizeStringList(progress.completedSteps),
+    completedDays: normalizeStringList(progress.completedDays).filter((day) => weeklyRhythm.includes(day)),
+  }
+}
+
+function normalizeStringList(value: unknown) {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : []
 }
 
 export default PreventivePage

@@ -2204,6 +2204,148 @@ input:focus-visible {
   padding: 0 13px;
 }
 
+.wellness-plan-workspace {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.36fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.wellness-plan-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wellness-plan-select {
+  display: grid;
+  gap: 8px;
+  min-height: 116px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 16px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  text-align: left;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.wellness-plan-select.active,
+.wellness-plan-select:hover {
+  border-color: color-mix(in srgb, var(--amber) 58%, var(--line));
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--amber-soft) 40%, transparent), transparent 72%),
+    color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  box-shadow: var(--shadow-small);
+  transform: translateY(-1px);
+}
+
+.wellness-plan-select-header,
+.wellness-plan-progress-row,
+.wellness-plan-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wellness-plan-select-header {
+  justify-content: space-between;
+}
+
+.wellness-plan-select strong {
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.wellness-plan-select small {
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.wellness-stamp {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--amber);
+  background: var(--amber-soft);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.wellness-plan-detail {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+}
+
+.wellness-plan-progress-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface-muted) 76%, transparent);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.wellness-plan-progress-row svg {
+  color: var(--amber);
+}
+
+.wellness-step-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wellness-day-section {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-muted) 62%, transparent);
+}
+
+.wellness-day-section span {
+  color: var(--amber);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.wellness-day-section p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.wellness-day-grid {
+  margin-top: 0;
+}
+
+.wellness-plan-actions {
+  justify-content: space-between;
+}
+
+.wellness-plan-actions .secondary-button {
+  min-height: 40px;
+  padding: 0 13px;
+}
+
 .saved-panel-heading {
   display: grid;
   gap: 4px;
@@ -3062,6 +3204,7 @@ input:focus-visible {
   .topic-grid,
   .topic-detail-grid,
   .medicine-note-workspace,
+  .wellness-plan-workspace,
   .habit-grid {
     grid-template-columns: 1fr;
   }
@@ -3099,8 +3242,14 @@ input:focus-visible {
     flex-direction: column;
   }
 
+  .wellness-plan-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .medicine-note-actions .primary-button,
-  .medicine-note-actions .secondary-button {
+  .medicine-note-actions .secondary-button,
+  .wellness-plan-actions .secondary-button {
     width: 100%;
   }
 
