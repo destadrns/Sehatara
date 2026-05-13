@@ -2,8 +2,9 @@ import { Brain, CheckCircle2, Heart, Pause, Play, RotateCcw, Trash2, Wind } from
 import { useEffect, useMemo, useState } from 'react'
 import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
-import { breathingSteps, groundingSteps } from '../data/mentalData'
-import type { FeatureConfig, PageId } from '../types/sehatara'
+import { getMentalData } from '../data/mentalData'
+import { getUiCopy } from '../i18n/uiCopy'
+import type { FeatureConfig, LanguageMode, PageId } from '../types/sehatara'
 import { createId } from '../utils/assistantResponses'
 import { createIsoTimestamp, formatShortDateTime, isSameLocalDate } from '../utils/dateTime'
 import {
@@ -16,6 +17,7 @@ import {
 
 type MentalPageProps = {
   feature: FeatureConfig
+  language: LanguageMode
   onNavigate: (page: PageId) => void
 }
 
@@ -39,29 +41,33 @@ type CalmSessionRecord = {
   createdAt: string
 }
 
-const calmSessionOptions: CalmSessionConfig[] = [
-  {
-    id: 'breathing',
-    label: 'Napas pelan',
-    eyebrow: 'Latihan napas',
-    description: 'Ikuti ritme napas pelan. Tidak perlu sempurna, cukup lebih teratur dari sebelumnya.',
-    durationSeconds: 120,
-    steps: breathingSteps,
-  },
-  {
-    id: 'grounding',
-    label: 'Grounding 5-4-3-2-1',
-    eyebrow: 'Kembali ke sekitar',
-    description: 'Pindahkan perhatian ke hal nyata di ruangan agar pikiran punya pijakan lagi.',
-    durationSeconds: 150,
-    steps: groundingSteps,
-  },
-]
-
-function MentalPage({ feature, onNavigate }: MentalPageProps) {
+function MentalPage({ feature, language, onNavigate }: MentalPageProps) {
+  const copy = getUiCopy(language).mental
+  const mentalData = getMentalData(language)
+  const calmSessionOptions = useMemo<CalmSessionConfig[]>(
+    () => [
+      {
+        id: 'breathing',
+        label: copy.breathingLabel,
+        eyebrow: copy.breathingEyebrow,
+        description: copy.breathingDescription,
+        durationSeconds: 120,
+        steps: mentalData.breathingSteps,
+      },
+      {
+        id: 'grounding',
+        label: copy.groundingLabel,
+        eyebrow: copy.groundingEyebrow,
+        description: copy.groundingDescription,
+        durationSeconds: 150,
+        steps: mentalData.groundingSteps,
+      },
+    ],
+    [copy, mentalData],
+  )
   const [mood, setMood] = useState(3)
   const [activeMode, setActiveMode] = useState<CalmMode>('breathing')
-  const [remainingSeconds, setRemainingSeconds] = useState(calmSessionOptions[0].durationSeconds)
+  const [remainingSeconds, setRemainingSeconds] = useState(120)
   const [isRunning, setIsRunning] = useState(false)
   const [sessionRecords, setSessionRecords] = useState<CalmSessionRecord[]>(readCalmSessionRecords)
   const activeSession = useMemo(
@@ -149,19 +155,19 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
 
   return (
     <main className="feature-page mental-page" data-accent={feature.accent}>
-      <PageHero feature={feature} onNavigate={onNavigate} />
+      <PageHero feature={feature} language={language} onNavigate={onNavigate} />
 
       <section className="tool-layout">
         <div className="interactive-panel calm-panel">
           <div className="workspace-toolbar">
             <div>
-              <span className="eyebrow">Latihan singkat</span>
-              <h2>Ambil jeda terpandu</h2>
+              <span className="eyebrow">{copy.workspaceEyebrow}</span>
+              <h2>{copy.workspaceTitle}</h2>
             </div>
-            <span className="soft-status">{todaySessionCount} sesi hari ini</span>
+            <span className="soft-status">{todaySessionCount} {copy.sessionsToday}</span>
           </div>
 
-          <div className="calm-mode-grid" aria-label="Pilih latihan ruang tenang">
+          <div className="calm-mode-grid" aria-label={copy.modeAria}>
             {calmSessionOptions.map((option) => {
               const active = option.id === activeMode
               const Icon = option.id === 'breathing' ? Wind : Brain
@@ -177,7 +183,7 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
                   <Icon size={20} />
                   <span>
                     <strong>{option.label}</strong>
-                    <small>{formatDuration(option.durationSeconds)}</small>
+                    <small>{formatDuration(option.durationSeconds, copy.minutes)}</small>
                   </span>
                 </button>
               )
@@ -185,7 +191,7 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
           </div>
 
           <section className="calm-session-card">
-            <div className="calm-session-visual" aria-label={`Sisa waktu ${formatTimer(remainingSeconds)}`}>
+            <div className="calm-session-visual" aria-label={`${copy.timeLeft} ${formatTimer(remainingSeconds)}`}>
               <span>{formatTimer(remainingSeconds)}</span>
               <small>{progressPercent}%</small>
             </div>
@@ -200,7 +206,7 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
             <div className="calm-session-actions">
               <button className="primary-button" onClick={toggleSession} type="button">
                 {isRunning ? <Pause size={16} /> : <Play size={16} />}
-                {isRunning ? 'Jeda' : 'Mulai'}
+                {isRunning ? copy.pause : copy.start}
               </button>
               <button
                 className="secondary-button"
@@ -209,29 +215,29 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
                 type="button"
               >
                 <CheckCircle2 size={16} />
-                Selesai
+                {copy.finish}
               </button>
               <button className="text-button compact-button" onClick={resetSession} type="button">
                 <RotateCcw size={14} />
-                Reset
+                {copy.reset}
               </button>
             </div>
           </section>
 
           <section className="mood-scale">
             <div>
-              <span className="eyebrow">Cek kondisi</span>
-              <h3>Seberapa penuh pikiranmu sekarang?</h3>
+              <span className="eyebrow">{copy.moodEyebrow}</span>
+              <h3>{copy.moodTitle}</h3>
             </div>
             <input
-              aria-label="Skala kondisi mental"
+              aria-label={copy.moodAria}
               max="5"
               min="1"
               onChange={(event) => setMood(Number(event.target.value))}
               type="range"
               value={mood}
             />
-            <span>{getMoodLabel(mood)}</span>
+            <span>{getMoodLabel(mood, language)}</span>
           </section>
 
           {sessionRecords.length > 0 && (
@@ -239,22 +245,22 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
               <div className="side-heading inline">
                 <Heart size={19} />
                 <div>
-                  <span className="eyebrow">Riwayat singkat</span>
-                  <h3>Sesi yang selesai</h3>
+                  <span className="eyebrow">{copy.historyEyebrow}</span>
+                  <h3>{copy.historyTitle}</h3>
                 </div>
               </div>
               <div className="calm-history-list">
                 {sessionRecords.slice(0, 4).map((record) => (
                   <article className="calm-history-item" key={record.id}>
                     <div>
-                      <strong>{record.label}</strong>
+                      <strong>{getModeLabel(record.mode, language)}</strong>
                       <span>
-                        Sesi selesai - {formatDuration(record.durationSeconds)} - {getMoodLabel(record.mood)} -{' '}
+                        {copy.completedSession} - {formatDuration(record.durationSeconds, copy.minutes)} - {getMoodLabel(record.mood, language)} -{' '}
                         {formatShortDateTime(record.createdAt)}
                       </span>
                     </div>
                     <button
-                      aria-label={`Hapus riwayat ${record.label}`}
+                      aria-label={`${copy.deleteHistoryLabel} ${record.label}`}
                       className="icon-action tiny-danger"
                       onClick={() => deleteSessionRecord(record.id)}
                       type="button"
@@ -265,33 +271,34 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
                 ))}
               </div>
               <button className="text-button compact-button" onClick={clearSessionRecords} type="button">
-                Hapus riwayat
+                {copy.clearHistory}
               </button>
             </section>
           )}
         </div>
 
         <aside className="workspace-side">
-          <FocusPanel feature={feature} />
+          <FocusPanel feature={feature} language={language} />
           <section className="side-panel">
-            <span className="eyebrow">Progress</span>
-            <h3 className="progress-title">{sessionRecords.length} sesi</h3>
+            <span className="eyebrow">{copy.progress}</span>
+            <h3 className="progress-title">{sessionRecords.length} {copy.sessionUnit}</h3>
             <p className="muted-copy">
-              Total sekitar {completedMinutes} menit jeda. Napas pelan {breathingCount} kali,
-              grounding {groundingCount} kali.
+              {copy.progressCopy
+                .replace('{minutes}', String(completedMinutes))
+                .replace('{breathing}', String(breathingCount))
+                .replace('{grounding}', String(groundingCount))}
             </p>
           </section>
           <section className="side-panel">
             <div className="side-heading">
               <Heart size={19} />
               <div>
-                <span className="eyebrow">Catatan aman</span>
-                <h3>Kalau terasa krisis</h3>
+                <span className="eyebrow">{copy.crisisEyebrow}</span>
+                <h3>{copy.crisisTitle}</h3>
               </div>
             </div>
             <p className="muted-copy">
-              Jika muncul dorongan menyakiti diri sendiri atau orang lain, jangan hadapi
-              sendiri. Hubungi layanan darurat setempat atau orang terpercaya sekarang.
+              {copy.crisisBody}
             </p>
           </section>
         </aside>
@@ -316,9 +323,9 @@ function formatTimer(seconds: number) {
   return `${minutes}:${remainingSeconds}`
 }
 
-function formatDuration(seconds: number) {
+function formatDuration(seconds: number, unit: string) {
   const minutes = Math.max(1, Math.round(seconds / 60))
-  return `${minutes} menit`
+  return `${minutes} ${unit}`
 }
 
 function readCalmSessionRecords(): CalmSessionRecord[] {
@@ -345,7 +352,7 @@ function normalizeCalmSessionRecord(value: unknown): CalmSessionRecord | null {
   return {
     id: typeof record.id === 'string' && record.id ? record.id : createId(),
     mode,
-    label: typeof record.label === 'string' && record.label ? record.label : getModeLabel(mode),
+    label: typeof record.label === 'string' && record.label ? record.label : getModeLabel(mode, 'id'),
     durationSeconds:
       typeof record.durationSeconds === 'number' && record.durationSeconds > 0
         ? record.durationSeconds
@@ -355,20 +362,24 @@ function normalizeCalmSessionRecord(value: unknown): CalmSessionRecord | null {
   }
 }
 
-function getModeLabel(mode: CalmMode) {
-  return mode === 'breathing' ? 'Napas pelan' : 'Grounding 5-4-3-2-1'
+function getModeLabel(mode: CalmMode, language: LanguageMode) {
+  if (mode === 'breathing') {
+    return language === 'en' ? 'Slow breathing' : 'Napas pelan'
+  }
+
+  return 'Grounding 5-4-3-2-1'
 }
 
-function getMoodLabel(value: number) {
+function getMoodLabel(value: number, language: LanguageMode) {
   if (value <= 2) {
-    return 'Mulai lebih tenang'
+    return language === 'en' ? 'Starting to feel calmer' : 'Mulai lebih tenang'
   }
 
   if (value === 3) {
-    return 'Masih cukup penuh'
+    return language === 'en' ? 'Still fairly full' : 'Masih cukup penuh'
   }
 
-  return 'Butuh jeda lebih serius'
+  return language === 'en' ? 'Needs a more serious pause' : 'Butuh jeda lebih serius'
 }
 
 export default MentalPage

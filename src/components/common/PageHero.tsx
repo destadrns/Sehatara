@@ -1,19 +1,22 @@
 import { ArrowLeft } from 'lucide-react'
-import type { FeatureConfig, PageId } from '../../types/sehatara'
+import { getUiCopy } from '../../i18n/uiCopy'
+import type { FeatureConfig, LanguageMode, PageId } from '../../types/sehatara'
 
 type PageHeroProps = {
   feature: FeatureConfig
+  language: LanguageMode
   onNavigate: (page: PageId) => void
 }
 
-function PageHero({ feature, onNavigate }: PageHeroProps) {
+function PageHero({ feature, language, onNavigate }: PageHeroProps) {
   const Icon = feature.icon
+  const copy = getUiCopy(language).common
 
   return (
     <section className="feature-hero" data-accent={feature.accent}>
       <button className="text-button" onClick={() => onNavigate('home')} type="button">
         <ArrowLeft size={17} />
-        Beranda
+        {copy.home}
       </button>
 
       <div className="feature-hero-grid">
@@ -36,7 +39,7 @@ function PageHero({ feature, onNavigate }: PageHeroProps) {
           <span className="ornament-step one" />
           <span className="ornament-step two" />
           <span className="ornament-step three" />
-          <span className="ornament-note">Safe guidance</span>
+          <span className="ornament-note">{copy.safeGuidance}</span>
         </div>
       </div>
     </section>

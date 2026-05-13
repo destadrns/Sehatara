@@ -1,13 +1,16 @@
 import { Check, ClipboardList } from 'lucide-react'
-import type { FeatureConfig } from '../../types/sehatara'
+import { getUiCopy } from '../../i18n/uiCopy'
+import type { FeatureConfig, LanguageMode } from '../../types/sehatara'
 
-function FocusPanel({ feature }: { feature: FeatureConfig }) {
+function FocusPanel({ feature, language }: { feature: FeatureConfig; language: LanguageMode }) {
+  const copy = getUiCopy(language).common
+
   return (
     <section className="side-panel focus-panel">
       <div className="side-heading">
         <ClipboardList size={19} />
         <div>
-          <span className="eyebrow">Fokus</span>
+          <span className="eyebrow">{copy.focus}</span>
           <h3>{feature.panelTitle}</h3>
         </div>
       </div>

@@ -1,15 +1,28 @@
-import { HeartPulse, Moon, RotateCcw, ShieldCheck, Sun } from 'lucide-react'
-import { features } from '../../data/features'
-import type { PageId, ThemeMode } from '../../types/sehatara'
+import { HeartPulse, Languages, Moon, RotateCcw, ShieldCheck, Sun } from 'lucide-react'
+import { getUiCopy } from '../../i18n/uiCopy'
+import type { FeatureConfig, LanguageMode, PageId, ThemeMode } from '../../types/sehatara'
 
 type AppHeaderProps = {
+  features: FeatureConfig[]
+  language: LanguageMode
   page: PageId
   theme: ThemeMode
+  onLanguageToggle: () => void
   onNavigate: (page: PageId) => void
   onThemeToggle: () => void
 }
 
-function AppHeader({ page, theme, onNavigate, onThemeToggle }: AppHeaderProps) {
+function AppHeader({
+  features,
+  language,
+  page,
+  theme,
+  onLanguageToggle,
+  onNavigate,
+  onThemeToggle,
+}: AppHeaderProps) {
+  const copy = getUiCopy(language).header
+
   return (
     <header className="app-header">
       <button className="brand-button" onClick={() => onNavigate('home')} type="button">
@@ -18,17 +31,17 @@ function AppHeader({ page, theme, onNavigate, onThemeToggle }: AppHeaderProps) {
         </span>
         <span>
           <strong>Sehatara</strong>
-          <small>Panduan kesehatan awal</small>
+          <small>{copy.tagline}</small>
         </span>
       </button>
 
-      <nav className="main-nav" aria-label="Navigasi utama Sehatara">
+      <nav className="main-nav" aria-label={copy.navAria}>
         <button
           className={page === 'home' ? 'nav-item active' : 'nav-item'}
           onClick={() => onNavigate('home')}
           type="button"
         >
-          Mulai
+          {copy.home}
         </button>
         {features.map((feature) => (
           <button
@@ -45,12 +58,21 @@ function AppHeader({ page, theme, onNavigate, onThemeToggle }: AppHeaderProps) {
       <div className="header-actions">
         <span className="safe-label">
           <ShieldCheck size={16} />
-          Edukasi aman
+          {copy.safe}
         </span>
+        <button
+          className="language-toggle"
+          onClick={onLanguageToggle}
+          title={copy.languageTitle}
+          type="button"
+        >
+          <Languages size={16} />
+          <span>{copy.languageShort}</span>
+        </button>
         <button
           className="icon-action"
           onClick={onThemeToggle}
-          title={theme === 'dark' ? 'Aktifkan tema terang' : 'Aktifkan tema gelap'}
+          title={theme === 'dark' ? copy.lightTitle : copy.darkTitle}
           type="button"
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -58,7 +80,7 @@ function AppHeader({ page, theme, onNavigate, onThemeToggle }: AppHeaderProps) {
         <button
           className="icon-action desktop-only"
           onClick={() => onNavigate('home')}
-          title="Kembali ke beranda"
+          title={copy.homeTitle}
           type="button"
         >
           <RotateCcw size={18} />

@@ -6,14 +6,14 @@ export function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-export function getIntensityLabel(value: number) {
+export function getIntensityLabel(value: number, language = 'id') {
   if (value <= 3) {
-    return 'Ringan'
+    return language === 'en' ? 'Mild' : 'Ringan'
   }
 
   if (value <= 6) {
-    return 'Sedang'
+    return language === 'en' ? 'Moderate' : 'Sedang'
   }
 
-  return 'Berat'
+  return language === 'en' ? 'Severe' : 'Berat'
 }

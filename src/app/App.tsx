@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/layout/AppHeader'
-import { features } from '../data/features'
+import { features, getFeatures } from '../data/features'
 import ChatPage from '../pages/ChatPage'
 import HomePage from '../pages/HomePage'
 import MedicinePage from '../pages/MedicinePage'
@@ -8,6 +8,7 @@ import MentalPage from '../pages/MentalPage'
 import PreventivePage from '../pages/PreventivePage'
 import SymptomPage from '../pages/SymptomPage'
 import type {
+  LanguageMode,
   PageId,
   SaveMedicineNoteInput,
   SaveSymptomRecordInput,
@@ -31,6 +32,7 @@ import {
 function App() {
   const [page, setPage] = useState<PageId>(getInitialPage)
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme)
+  const [language, setLanguage] = useState<LanguageMode>(getInitialLanguage)
   const [symptomRecords, setSymptomRecords] = useState<SavedSymptomRecord[]>(() =>
     readStorageList<SavedSymptomRecord>(storageKeys.symptomRecords),
   )
@@ -41,15 +43,20 @@ function App() {
     readStorageList<SavedWellnessPlan>(storageKeys.wellnessPlans),
   )
 
+  const localizedFeatures = useMemo(() => getFeatures(language), [language])
   const selectedFeature = useMemo(
-    () => features.find((feature) => feature.id === page),
-    [page],
+    () => localizedFeatures.find((feature) => feature.id === page),
+    [localizedFeatures, page],
   )
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     writeStorageText(storageKeys.theme, theme)
   }, [theme])
+
+  useEffect(() => {
+    writeStorageText(storageKeys.language, language)
+  }, [language])
 
   useEffect(() => {
     writeStorageValue(storageKeys.medicineNotes, medicineNotes)
@@ -84,6 +91,10 @@ function App() {
 
   function toggleTheme() {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+  }
+
+  function toggleLanguage() {
+    setLanguage((current) => (current === 'id' ? 'en' : 'id'))
   }
 
   function saveMedicineNote(note: SaveMedicineNoteInput) {
@@ -134,6 +145,9 @@ function App() {
   return (
     <div className="app-shell">
       <AppHeader
+        features={localizedFeatures}
+        language={language}
+        onLanguageToggle={toggleLanguage}
         onNavigate={navigate}
         onThemeToggle={toggleTheme}
         page={page}
@@ -143,6 +157,8 @@ function App() {
       {renderPage({
         page,
         selectedFeature,
+        features: localizedFeatures,
+        language,
         symptomRecords,
         medicineNotes,
         wellnessPlans,
@@ -179,6 +195,8 @@ type PageActions = {
 type RenderPageParams = {
   page: PageId
   selectedFeature: (typeof features)[number] | undefined
+  features: typeof features
+  language: LanguageMode
   symptomRecords: SavedSymptomRecord[]
   medicineNotes: SavedMedicineNote[]
   wellnessPlans: SavedWellnessPlan[]
@@ -188,19 +206,22 @@ type RenderPageParams = {
 function renderPage({
   page,
   selectedFeature,
+  features,
+  language,
   symptomRecords,
   medicineNotes,
   wellnessPlans,
   actions,
 }: RenderPageParams) {
   if (!selectedFeature || page === 'home') {
-    return <HomePage onNavigate={actions.navigate} />
+    return <HomePage features={features} language={language} onNavigate={actions.navigate} />
   }
 
   if (page === 'symptom') {
     return (
       <SymptomPage
         feature={selectedFeature}
+        language={language}
         onNavigate={actions.navigate}
         onClearSymptomRecords={actions.clearSymptomRecords}
         onDeleteSymptomRecord={actions.deleteSymptomRecord}
@@ -216,6 +237,7 @@ function renderPage({
     return (
       <MedicinePage
         feature={selectedFeature}
+        language={language}
         onClearMedicineNotes={actions.clearMedicineNotes}
         onDeleteMedicineNote={actions.deleteMedicineNote}
         onNavigate={actions.navigate}
@@ -228,6 +250,7 @@ function renderPage({
     return (
       <PreventivePage
         feature={selectedFeature}
+        language={language}
         onClearWellnessPlans={actions.clearWellnessPlans}
         onDeleteWellnessPlan={actions.deleteWellnessPlan}
         onNavigate={actions.navigate}
@@ -237,12 +260,13 @@ function renderPage({
   }
 
   if (page === 'mental') {
-    return <MentalPage feature={selectedFeature} onNavigate={actions.navigate} />
+    return <MentalPage feature={selectedFeature} language={language} onNavigate={actions.navigate} />
   }
 
   return (
     <ChatPage
       feature={selectedFeature}
+      language={language}
       onNavigate={actions.navigate}
       onSaveMedicineNote={actions.saveMedicineNote}
       onSaveWellnessPlan={actions.saveWellnessPlan}
@@ -265,6 +289,16 @@ function getInitialTheme(): ThemeMode {
   }
 
   return 'light'
+}
+
+function getInitialLanguage(): LanguageMode {
+  const savedLanguage = readStorageText(storageKeys.language)
+
+  if (savedLanguage === 'id' || savedLanguage === 'en') {
+    return savedLanguage
+  }
+
+  return 'id'
 }
 
 export default App

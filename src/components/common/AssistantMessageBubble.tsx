@@ -1,7 +1,16 @@
 import { AlertTriangle, MessageCircle, Sparkles } from 'lucide-react'
-import type { ChatMessage } from '../../types/sehatara'
+import { getUiCopy } from '../../i18n/uiCopy'
+import type { ChatMessage, LanguageMode } from '../../types/sehatara'
 
-function AssistantMessageBubble({ message }: { message: Extract<ChatMessage, { role: 'assistant' }> }) {
+function AssistantMessageBubble({
+  language,
+  message,
+}: {
+  language: LanguageMode
+  message: Extract<ChatMessage, { role: 'assistant' }>
+}) {
+  const copy = getUiCopy(language).common
+
   return (
     <article className="message assistant-message">
       <span className="assistant-avatar">
@@ -10,7 +19,7 @@ function AssistantMessageBubble({ message }: { message: Extract<ChatMessage, { r
       <div className="assistant-bubble">
         <div className="bubble-title">
           <strong>{message.title}</strong>
-          <span>{message.source === 'gemini' ? 'Gemini API' : 'Sehatara'}</span>
+          <span>{message.source === 'gemini' ? copy.geminiApi : copy.sehatara}</span>
         </div>
         <p>{message.body}</p>
         <ul>

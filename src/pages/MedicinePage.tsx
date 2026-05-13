@@ -13,8 +13,9 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
-import { medicineChecklist, medicineTopics } from '../data/medicineData'
-import type { FeatureConfig, PageId, SavedMedicineNote } from '../types/sehatara'
+import { getMedicineData } from '../data/medicineData'
+import { formatHandoffSource, getUiCopy } from '../i18n/uiCopy'
+import type { FeatureConfig, LanguageMode, PageId, SavedMedicineNote } from '../types/sehatara'
 import { createIsoTimestamp, formatShortDateTime } from '../utils/dateTime'
 import {
   normalizeDateString,
@@ -26,6 +27,7 @@ import {
 
 type MedicinePageProps = {
   feature: FeatureConfig
+  language: LanguageMode
   onClearMedicineNotes: () => void
   onDeleteMedicineNote: (id: string) => void
   onNavigate: (page: PageId) => void
@@ -40,13 +42,16 @@ type MedicineNoteProgress = {
 
 function MedicinePage({
   feature,
+  language,
   onClearMedicineNotes,
   onDeleteMedicineNote,
   onNavigate,
   savedNotes,
 }: MedicinePageProps) {
+  const copy = getUiCopy(language).medicine
+  const { medicineChecklist, medicineTopics } = getMedicineData(language)
   const [query, setQuery] = useState('')
-  const [activeTopic, setActiveTopic] = useState(medicineTopics[0].id)
+  const [activeTopic, setActiveTopic] = useState<string>(medicineTopics[0].id)
   const [checkedTopicItems, setCheckedTopicItems] = useState<Record<string, string[]>>({})
   const [showSavedNotes, setShowSavedNotes] = useState(false)
   const [confirmClearNotes, setConfirmClearNotes] = useState(false)
@@ -63,8 +68,8 @@ function MedicinePage({
     [activeSavedNoteId, latestSavedNote, savedNotes],
   )
   const activeSavedNoteChecklist = useMemo(
-    () => (activeSavedNote ? getSavedNoteChecklist(activeSavedNote) : []),
-    [activeSavedNote],
+    () => (activeSavedNote ? getSavedNoteChecklist(activeSavedNote, language) : []),
+    [activeSavedNote, language],
   )
   const activeSavedNoteProgress = activeSavedNote
     ? noteProgressById[activeSavedNote.id] ?? createEmptyMedicineNoteProgress()
@@ -174,24 +179,24 @@ function MedicinePage({
 
   return (
     <main className="feature-page medicine-page" data-accent={feature.accent}>
-      <PageHero feature={feature} onNavigate={onNavigate} />
+      <PageHero feature={feature} language={language} onNavigate={onNavigate} />
 
       <section className="tool-layout">
         <div className="interactive-panel">
           <div className="workspace-toolbar">
             <div>
-              <span className="eyebrow">Catatan obat</span>
-              <h2>Catat dulu, baru tanyakan</h2>
+              <span className="eyebrow">{copy.workspaceEyebrow}</span>
+              <h2>{copy.workspaceTitle}</h2>
             </div>
-            <span className="soft-status">Info umum</span>
+            <span className="soft-status">{copy.status}</span>
           </div>
 
           <div className="medicine-search">
             <Search size={20} />
             <input
-              aria-label="Nama obat"
+              aria-label={copy.searchAria}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Tulis nama obat atau kategori, misalnya obat flu..."
+              placeholder={copy.searchPlaceholder}
               type="text"
               value={query}
             />
@@ -203,12 +208,12 @@ function MedicinePage({
                 <div className="side-heading inline">
                   <History size={19} />
                   <div>
-                    <span className="eyebrow">Dari fitur lain</span>
-                    <h3>Catatan obat tersimpan</h3>
+                    <span className="eyebrow">{copy.fromOther}</span>
+                    <h3>{copy.savedTitle}</h3>
                   </div>
                 </div>
                 <div className="saved-panel-actions">
-                  <span className="source-pill">{savedNotes.length} catatan</span>
+                  <span className="source-pill">{savedNotes.length} {copy.noteCount}</span>
                   <button
                     className="text-button compact-button"
                     onClick={() => {
@@ -217,10 +222,10 @@ function MedicinePage({
                     }}
                     type="button"
                   >
-                    {showSavedNotes ? 'Tutup' : 'Lihat semua'}
+                    {showSavedNotes ? copy.close : copy.seeAll}
                   </button>
                   <button
-                    aria-label="Hapus semua catatan obat"
+                    aria-label={copy.deleteAllLabel}
                     className="icon-action quiet-danger"
                     onClick={() => setConfirmClearNotes((current) => !current)}
                     type="button"
@@ -237,8 +242,8 @@ function MedicinePage({
                   type="button"
                 >
                   <span className="saved-summary-meta">
-                    <span className="source-pill">Terbaru</span>
-                    <span>{savedNotes.length} catatan tersimpan</span>
+                    <span className="source-pill">{copy.latest}</span>
+                    <span>{savedNotes.length} {copy.savedCount}</span>
                   </span>
                   <strong>{latestSavedNote.title}</strong>
                   <small>{latestSavedNote.context}</small>
@@ -247,29 +252,29 @@ function MedicinePage({
 
               {confirmClearNotes && (
                 <div className="history-confirm">
-                  <span>Hapus semua catatan obat tersimpan?</span>
+                  <span>{copy.confirmClear}</span>
                   <button
                     className="primary-button danger-button compact-button"
                     onClick={handleClearMedicineNotes}
                     type="button"
                   >
-                    Hapus
+                    {copy.delete}
                   </button>
                   <button
                     className="text-button compact-button"
                     onClick={() => setConfirmClearNotes(false)}
                     type="button"
                   >
-                    Batal
+                    {copy.cancel}
                   </button>
                 </div>
               )}
 
               {showSavedNotes && (
                 <div className="medicine-note-workspace">
-                  <div className="medicine-note-list" aria-label="Daftar catatan obat tersimpan">
+                  <div className="medicine-note-list" aria-label={copy.listAria}>
                     {savedNotes.map((note) => {
-                      const checklist = getSavedNoteChecklist(note)
+                      const checklist = getSavedNoteChecklist(note, language)
                       const progress = noteProgressById[note.id] ?? createEmptyMedicineNoteProgress()
                       const understoodCount = checklist.filter((item) => progress.understood.includes(item)).length
                       const active = activeSavedNote?.id === note.id
@@ -283,11 +288,11 @@ function MedicinePage({
                           type="button"
                         >
                           <span className="medicine-note-select-header">
-                            <span className="source-pill">{note.source}</span>
-                            {progress.checkedAt && <span className="checked-stamp">Sudah dicek</span>}
+                            <span className="source-pill">{formatHandoffSource(note.source, language)}</span>
+                            {progress.checkedAt && <span className="checked-stamp">{copy.checked}</span>}
                           </span>
                           <strong>{note.title}</strong>
-                          <small>{understoodCount}/{checklist.length} dipahami</small>
+                          <small>{understoodCount}/{checklist.length} {copy.understood}</small>
                         </button>
                       )
                     })}
@@ -297,11 +302,11 @@ function MedicinePage({
                     <article className="medicine-note-detail readable-saved-card">
                       <div className="saved-card-header saved-card-header-row">
                         <div className="saved-card-title">
-                          <span className="source-pill">{activeSavedNote.source}</span>
+                          <span className="source-pill">{formatHandoffSource(activeSavedNote.source, language)}</span>
                           <strong>{activeSavedNote.title}</strong>
                         </div>
                         <button
-                          aria-label={`Hapus catatan ${activeSavedNote.title}`}
+                          aria-label={`${copy.deleteNoteLabel} ${activeSavedNote.title}`}
                           className="icon-action tiny-danger"
                           onClick={() => deleteSavedNote(activeSavedNote.id)}
                           type="button"
@@ -313,21 +318,21 @@ function MedicinePage({
                       <div className="medicine-note-progress-row">
                         <span>
                           <CheckCircle2 size={15} />
-                          {activeUnderstoodCount}/{activeSavedNoteChecklist.length} dipahami
+                          {activeUnderstoodCount}/{activeSavedNoteChecklist.length} {copy.progressUnderstood}
                         </span>
                         <span>
                           <FileText size={15} />
-                          {activeSavedNoteProgress.personalNote.trim() ? 'Ada catatan pribadi' : 'Belum ada catatan pribadi'}
+                          {activeSavedNoteProgress.personalNote.trim() ? copy.hasPersonalNote : copy.noPersonalNote}
                         </span>
                       </div>
 
                       <div className="saved-context-block">
-                        <span>Konteks singkat</span>
+                        <span>{copy.context}</span>
                         <p>{activeSavedNote.context}</p>
                       </div>
 
                       <div className="saved-readable-section">
-                        <span>Checklist pemahaman</span>
+                        <span>{copy.understanding}</span>
                         <div className="medicine-understanding-list">
                           {activeSavedNoteChecklist.map((item) => {
                             const checked = activeSavedNoteProgress.understood.includes(item)
@@ -349,15 +354,15 @@ function MedicinePage({
                       </div>
 
                       <label className="personal-note-field" htmlFor={`personal-note-${activeSavedNote.id}`}>
-                        <span>Catatan pribadi sederhana</span>
+                        <span>{copy.personalNote}</span>
                         <textarea
                           id={`personal-note-${activeSavedNote.id}`}
                           onChange={(event) => updatePersonalNote(activeSavedNote.id, event.target.value)}
-                          placeholder="Contoh: tanyakan ke apoteker karena sedang minum obat lain..."
+                          placeholder={copy.personalPlaceholder}
                           rows={3}
                           value={activeSavedNoteProgress.personalNote}
                         />
-                        <small>Tersimpan otomatis di perangkat ini.</small>
+                        <small>{copy.autosave}</small>
                       </label>
 
                       <div className="medicine-note-actions">
@@ -367,11 +372,11 @@ function MedicinePage({
                           type="button"
                         >
                           <CheckCircle2 size={16} />
-                          {activeSavedNoteProgress.checkedAt ? 'Batalkan sudah dicek' : 'Tandai sudah dicek'}
+                          {activeSavedNoteProgress.checkedAt ? copy.unmarkChecked : copy.markChecked}
                         </button>
                         {activeSavedNoteProgress.checkedAt && (
                           <span className="checked-stamp">
-                            Dicek {formatShortDateTime(activeSavedNoteProgress.checkedAt)}
+                            {copy.checkedAt} {formatShortDateTime(activeSavedNoteProgress.checkedAt)}
                           </span>
                         )}
                       </div>
@@ -409,7 +414,7 @@ function MedicinePage({
           <section className="topic-detail-panel">
             <div className="topic-detail-heading">
               <span className="source-pill">{topic.label}</span>
-              <h3>Pahami sebelum memilih</h3>
+              <h3>{copy.understandBefore}</h3>
               <p>{topic.bestFor}</p>
             </div>
 
@@ -417,7 +422,7 @@ function MedicinePage({
               <article className="detail-note-card caution">
                 <ShieldAlert size={19} />
                 <div>
-                  <span>Hati-hati bila</span>
+                  <span>{copy.caution}</span>
                   <p>{topic.avoidWhen}</p>
                 </div>
               </article>
@@ -425,8 +430,8 @@ function MedicinePage({
               <article className="detail-note-card">
                 <ClipboardCheck size={19} />
                 <div>
-                  <span>Checklist pribadi</span>
-                  <strong>{topicProgress} selesai</strong>
+                  <span>{copy.personalChecklist}</span>
+                  <strong>{topicProgress} {copy.done}</strong>
                 </div>
               </article>
             </div>
@@ -453,7 +458,7 @@ function MedicinePage({
             <div className="question-panel">
               <MessageCircle size={19} />
               <div>
-                <span>Pertanyaan untuk apoteker</span>
+                <span>{copy.pharmacistQuestions}</span>
                 <ul>
                   {topic.questions.map((item) => (
                     <li key={item}>{item}</li>
@@ -466,12 +471,11 @@ function MedicinePage({
           <section className="info-band">
             <ShieldAlert size={22} />
             <div>
-              <span className="eyebrow">{query ? 'Catatan pencarian' : 'Pengingat aman'}</span>
-              <strong>{query ? `Catatan untuk "${query}"` : 'Yang perlu dicek sebelum memilih'}</strong>
+              <span className="eyebrow">{query ? copy.searchNote : copy.safeReminder}</span>
+              <strong>{query ? `${copy.noteFor} "${query}"` : copy.checkBefore}</strong>
               {query ? (
                 <p>
-                  Pastikan kamu membaca label, aturan pakai, dan peringatan pada kemasan.
-                  Untuk kondisi pribadi, tanyakan langsung ke apoteker atau dokter.
+                  {copy.queryGuidance}
                 </p>
               ) : (
                 <ul className="mini-guidance-list">
@@ -485,13 +489,13 @@ function MedicinePage({
         </div>
 
         <aside className="workspace-side">
-          <FocusPanel feature={feature} />
+          <FocusPanel feature={feature} language={language} />
           <section className="side-panel">
             <div className="side-heading">
               <CheckCircle2 size={19} />
               <div>
-                <span className="eyebrow">Checklist</span>
-                <h3>Sebelum memakai obat</h3>
+                <span className="eyebrow">{copy.checklistEyebrow}</span>
+                <h3>{copy.checklistTitle}</h3>
               </div>
             </div>
             <ul className="check-list relaxed">
@@ -537,11 +541,13 @@ function normalizeMedicineNoteProgress(value: unknown): MedicineNoteProgress | n
   }
 }
 
-function getSavedNoteChecklist(note: SavedMedicineNote) {
+function getSavedNoteChecklist(note: SavedMedicineNote, language: LanguageMode) {
+  const copy = getUiCopy(language).medicine
+
   return [
     ...note.guidance,
-    'Saya paham catatan ini bukan resep atau dosis personal.',
-    'Saya tahu kapan perlu bertanya ke apoteker atau dokter.',
+    copy.understandNotDose,
+    copy.askProfessional,
   ]
 }
 

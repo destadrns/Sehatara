@@ -2,8 +2,9 @@ import { CalendarDays, Check, CheckCircle2, ClipboardCheck, History, Leaf, Rotat
 import { useEffect, useMemo, useState } from 'react'
 import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
-import { habitFocusOptions, weeklyRhythm } from '../data/preventiveData'
-import type { FeatureConfig, PageId, SavedWellnessPlan } from '../types/sehatara'
+import { getPreventiveData } from '../data/preventiveData'
+import { formatHandoffSource, getUiCopy } from '../i18n/uiCopy'
+import type { FeatureConfig, LanguageMode, PageId, SavedWellnessPlan } from '../types/sehatara'
 import {
   normalizeStringList,
   readStorageRecordMap,
@@ -13,6 +14,7 @@ import {
 
 type PreventivePageProps = {
   feature: FeatureConfig
+  language: LanguageMode
   onClearWellnessPlans: () => void
   onDeleteWellnessPlan: (id: string) => void
   onNavigate: (page: PageId) => void
@@ -24,14 +26,22 @@ type WellnessPlanProgress = {
   completedDays: string[]
 }
 
+const validWeekDays = new Set([
+  ...getPreventiveData('id').weeklyRhythm,
+  ...getPreventiveData('en').weeklyRhythm,
+])
+
 function PreventivePage({
   feature,
+  language,
   onClearWellnessPlans,
   onDeleteWellnessPlan,
   onNavigate,
   savedPlans,
 }: PreventivePageProps) {
-  const [activeHabit, setActiveHabit] = useState(habitFocusOptions[0].id)
+  const copy = getUiCopy(language).preventive
+  const { habitFocusOptions, weeklyRhythm } = getPreventiveData(language)
+  const [activeHabit, setActiveHabit] = useState<string>(habitFocusOptions[0].id)
   const [checkedDays, setCheckedDays] = useState<string[]>(['Sen'])
   const [completedHabitSteps, setCompletedHabitSteps] = useState<Record<string, string[]>>({})
   const [showSavedPlans, setShowSavedPlans] = useState(false)
@@ -81,6 +91,13 @@ function PreventivePage({
       setConfirmClearPlans(false)
     }
   }, [savedPlans])
+
+  useEffect(() => {
+    setCheckedDays((current) => {
+      const validDays = current.filter((day) => weeklyRhythm.includes(day))
+      return validDays.length > 0 ? validDays : [weeklyRhythm[0]]
+    })
+  }, [weeklyRhythm])
 
   function toggleDay(day: string) {
     setCheckedDays((current) =>
@@ -177,16 +194,16 @@ function PreventivePage({
 
   return (
     <main className="feature-page preventive-page" data-accent={feature.accent}>
-      <PageHero feature={feature} onNavigate={onNavigate} />
+      <PageHero feature={feature} language={language} onNavigate={onNavigate} />
 
       <section className="tool-layout">
         <div className="interactive-panel">
           <div className="workspace-toolbar">
             <div>
-              <span className="eyebrow">Rencana pulih</span>
-              <h2>Pilih langkah kecil minggu ini</h2>
+              <span className="eyebrow">{copy.workspaceEyebrow}</span>
+              <h2>{copy.workspaceTitle}</h2>
             </div>
-            <span className="soft-status">7 hari</span>
+            <span className="soft-status">{copy.status}</span>
           </div>
 
           <div className="habit-grid">
@@ -209,14 +226,14 @@ function PreventivePage({
           <section className="habit-detail-panel">
             <div className="habit-detail-heading">
               <span className="source-pill">{habit.label}</span>
-              <h3>Mulai dari langkah yang ringan</h3>
+              <h3>{copy.habitHeading}</h3>
               <p>{habit.benefit}</p>
             </div>
 
             <div className="habit-target-card">
               <ClipboardCheck size={19} />
               <div>
-                <span>Target realistis</span>
+                <span>{copy.target}</span>
                 <p>{habit.target}</p>
               </div>
             </div>
@@ -245,7 +262,7 @@ function PreventivePage({
               {completedSteps.length > 0 && (
                 <button className="text-button compact-button" onClick={resetHabitProgress} type="button">
                   <RotateCcw size={14} />
-                  Reset
+                  {copy.reset}
                 </button>
               )}
             </div>
@@ -257,12 +274,12 @@ function PreventivePage({
                 <div className="side-heading inline">
                   <History size={19} />
                   <div>
-                    <span className="eyebrow">Masuk dari gejala/chat</span>
-                    <h3>Rencana tersimpan</h3>
+                    <span className="eyebrow">{copy.savedEyebrow}</span>
+                    <h3>{copy.savedTitle}</h3>
                   </div>
                 </div>
                 <div className="saved-panel-actions">
-                  <span className="source-pill">{savedPlans.length} rencana</span>
+                  <span className="source-pill">{savedPlans.length} {copy.planCount}</span>
                   <button
                     className="text-button compact-button"
                     onClick={() => {
@@ -271,10 +288,10 @@ function PreventivePage({
                     }}
                     type="button"
                   >
-                    {showSavedPlans ? 'Tutup' : 'Lihat semua'}
+                    {showSavedPlans ? copy.close : copy.seeAll}
                   </button>
                   <button
-                    aria-label="Hapus semua rencana pulih"
+                    aria-label={copy.deleteAllLabel}
                     className="icon-action quiet-danger"
                     onClick={() => setConfirmClearPlans((current) => !current)}
                     type="button"
@@ -291,8 +308,8 @@ function PreventivePage({
                   type="button"
                 >
                   <span className="saved-summary-meta">
-                    <span className="source-pill">Terbaru</span>
-                    <span>{savedPlans.length} rencana tersimpan</span>
+                    <span className="source-pill">{copy.latest}</span>
+                    <span>{savedPlans.length} {copy.savedCount}</span>
                   </span>
                   <strong>{latestSavedPlan.title}</strong>
                   <small>{latestSavedPlan.context}</small>
@@ -301,27 +318,27 @@ function PreventivePage({
 
               {confirmClearPlans && (
                 <div className="history-confirm">
-                  <span>Hapus semua rencana pulih tersimpan?</span>
+                  <span>{copy.confirmClear}</span>
                   <button
                     className="primary-button danger-button compact-button"
                     onClick={handleClearWellnessPlans}
                     type="button"
                   >
-                    Hapus
+                    {copy.delete}
                   </button>
                   <button
                     className="text-button compact-button"
                     onClick={() => setConfirmClearPlans(false)}
                     type="button"
                   >
-                    Batal
+                    {copy.cancel}
                   </button>
                 </div>
               )}
 
               {showSavedPlans && (
                 <div className="wellness-plan-workspace">
-                  <div className="wellness-plan-list" aria-label="Daftar rencana pulih tersimpan">
+                  <div className="wellness-plan-list" aria-label={copy.listAria}>
                     {savedPlans.map((plan) => {
                       const progress = planProgressById[plan.id] ?? createEmptyWellnessPlanProgress()
                       const completedStepCount = plan.steps.filter((step) =>
@@ -341,11 +358,11 @@ function PreventivePage({
                           type="button"
                         >
                           <span className="wellness-plan-select-header">
-                            <span className="source-pill">{plan.source}</span>
-                            {completedDayCount >= 7 && <span className="wellness-stamp">7 hari lengkap</span>}
+                            <span className="source-pill">{formatHandoffSource(plan.source, language)}</span>
+                            {completedDayCount >= 7 && <span className="wellness-stamp">{copy.completedWeek}</span>}
                           </span>
                           <strong>{plan.title}</strong>
-                          <small>{completedStepCount}/{plan.steps.length} langkah, {completedDayCount}/7 hari</small>
+                          <small>{completedStepCount}/{plan.steps.length} {copy.step}, {completedDayCount}/7 {copy.day}</small>
                         </button>
                       )
                     })}
@@ -355,11 +372,11 @@ function PreventivePage({
                     <article className="wellness-plan-detail readable-saved-card">
                       <div className="saved-card-header saved-card-header-row">
                         <div className="saved-card-title">
-                          <span className="source-pill">{activeSavedPlan.source}</span>
+                          <span className="source-pill">{formatHandoffSource(activeSavedPlan.source, language)}</span>
                           <strong>{activeSavedPlan.title}</strong>
                         </div>
                         <button
-                          aria-label={`Hapus rencana ${activeSavedPlan.title}`}
+                          aria-label={`${copy.deletePlanLabel} ${activeSavedPlan.title}`}
                           className="icon-action tiny-danger"
                           onClick={() => deleteSavedPlan(activeSavedPlan.id)}
                           type="button"
@@ -371,21 +388,21 @@ function PreventivePage({
                       <div className="wellness-plan-progress-row">
                         <span>
                           <CheckCircle2 size={15} />
-                          {activePlanCompletedSteps}/{activeSavedPlan.steps.length} langkah
+                          {activePlanCompletedSteps}/{activeSavedPlan.steps.length} {copy.step}
                         </span>
                         <span>
                           <CalendarDays size={15} />
-                          {activePlanCompletedDays}/7 hari
+                          {activePlanCompletedDays}/7 {copy.day}
                         </span>
                       </div>
 
                       <div className="saved-context-block">
-                        <span>Konteks singkat</span>
+                        <span>{copy.context}</span>
                         <p>{activeSavedPlan.context}</p>
                       </div>
 
                       <div className="saved-readable-section">
-                        <span>Checklist langkah</span>
+                        <span>{copy.checklist}</span>
                         <div className="wellness-step-list">
                           {activeSavedPlan.steps.map((step) => {
                             const checked = activeSavedPlanProgress.completedSteps.includes(step)
@@ -408,8 +425,8 @@ function PreventivePage({
 
                       <section className="wellness-day-section">
                         <div>
-                          <span>Progress 7 hari</span>
-                          <p>Tandai hari ketika kamu berhasil menjalankan minimal satu langkah.</p>
+                          <span>{copy.progressTitle}</span>
+                          <p>{copy.progressBody}</p>
                         </div>
                         <div className="day-grid wellness-day-grid">
                           {weeklyRhythm.map((day) => {
@@ -438,10 +455,10 @@ function PreventivePage({
                           type="button"
                         >
                           <RotateCcw size={16} />
-                          Reset progress
+                          {copy.resetProgress}
                         </button>
                         {activePlanCompletedDays >= 7 && (
-                          <span className="wellness-stamp">Rencana 7 hari selesai</span>
+                          <span className="wellness-stamp">{copy.finishedPlan}</span>
                         )}
                       </div>
                     </article>
@@ -453,7 +470,7 @@ function PreventivePage({
 
           <section className="plan-card">
             <div>
-              <span className="eyebrow">Rencana kecil</span>
+              <span className="eyebrow">{copy.smallPlan}</span>
               <h3>{habit.label}</h3>
             </div>
             <ol className="readable-step-list">
@@ -469,8 +486,8 @@ function PreventivePage({
             <div className="side-heading inline">
               <CalendarDays size={19} />
               <div>
-                <span className="eyebrow">Tracker</span>
-                <h3>Tandai hari yang berhasil</h3>
+                <span className="eyebrow">{copy.tracker}</span>
+                <h3>{copy.trackerTitle}</h3>
               </div>
             </div>
             <div className="day-grid">
@@ -494,13 +511,12 @@ function PreventivePage({
         </div>
 
         <aside className="workspace-side">
-          <FocusPanel feature={feature} />
+          <FocusPanel feature={feature} language={language} />
           <section className="side-panel">
-            <span className="eyebrow">Progress</span>
-            <h3 className="progress-title">{checkedDays.length}/7 hari</h3>
+            <span className="eyebrow">{copy.progressEyebrow}</span>
+            <h3 className="progress-title">{checkedDays.length}/7 {copy.dayProgressSuffix}</h3>
             <p className="muted-copy">
-              {completedSteps.length}/{habit.plan.length} langkah {habit.label.toLowerCase()} sudah ditandai.
-              Targetnya bukan sempurna, tapi cukup konsisten untuk mulai terasa.
+              {completedSteps.length}/{habit.plan.length} {habit.label.toLowerCase()} {copy.progressCopy}
             </p>
           </section>
         </aside>
@@ -529,7 +545,7 @@ function normalizeWellnessPlanProgress(value: unknown): WellnessPlanProgress | n
 
   return {
     completedSteps: normalizeStringList(progress.completedSteps),
-    completedDays: normalizeStringList(progress.completedDays).filter((day) => weeklyRhythm.includes(day)),
+    completedDays: normalizeStringList(progress.completedDays).filter((day) => validWeekDays.has(day)),
   }
 }
 

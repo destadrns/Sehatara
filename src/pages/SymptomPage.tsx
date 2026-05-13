@@ -13,9 +13,11 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
-import { durationOptions, redFlags, symptomAreas } from '../data/symptomOptions'
+import { getSymptomOptions } from '../data/symptomOptions'
+import { getUiCopy } from '../i18n/uiCopy'
 import type {
   FeatureConfig,
+  LanguageMode,
   PageId,
   SaveMedicineNoteInput,
   SavedSymptomRecord,
@@ -31,6 +33,7 @@ import { readStorageValue, removeStorageValue, storageKeys, writeStorageValue } 
 
 type SymptomPageProps = {
   feature: FeatureConfig
+  language: LanguageMode
   onNavigate: (page: PageId) => void
   onClearSymptomRecords: () => void
   onDeleteSymptomRecord: (id: string) => void
@@ -52,6 +55,7 @@ type SymptomWorkspaceSnapshot = {
 
 function SymptomPage({
   feature,
+  language,
   onNavigate,
   onClearSymptomRecords,
   onDeleteSymptomRecord,
@@ -60,7 +64,10 @@ function SymptomPage({
   onSaveWellnessPlan,
   savedRecords,
 }: SymptomPageProps) {
-  const initialWorkspace = useMemo(() => readSymptomWorkspace(), [])
+  const copy = getUiCopy(language).symptom
+  const symptomOptions = useMemo(() => getSymptomOptions(language), [language])
+  const { durationOptions, redFlags, symptomAreas } = symptomOptions
+  const initialWorkspace = useMemo(() => readSymptomWorkspace(symptomOptions), [])
   const [symptomText, setSymptomText] = useState(initialWorkspace.symptomText)
   const [duration, setDuration] = useState(initialWorkspace.duration)
   const [areas, setAreas] = useState<string[]>(initialWorkspace.areas)
@@ -76,10 +83,10 @@ function SymptomPage({
   const [confirmClearHistory, setConfirmClearHistory] = useState(false)
 
   const trimmedSymptomText = symptomText.trim()
-  const areaLabel = useMemo(() => formatAreaList(areas), [areas])
+  const areaLabel = useMemo(() => formatAreaList(areas, language), [areas, language])
   const symptomContext = useMemo(
-    () => buildSymptomContext(symptomText, areas, duration, intensity, analysisResult?.summary),
-    [analysisResult?.summary, areas, duration, intensity, symptomText],
+    () => buildSymptomContext(symptomText, areas, duration, intensity, language, analysisResult?.summary),
+    [analysisResult?.summary, areas, duration, intensity, language, symptomText],
   )
   const selectedFlags = useMemo(
     () => redFlags.filter((flag) => activeFlags.includes(flag.id)),
@@ -91,16 +98,16 @@ function SymptomPage({
   )
   const localUrgent = selectedFlags.length > 0 || intensity >= 8
   const isUrgent = localUrgent || analysisResult?.urgencyLevel === 'high'
-  const hasChestArea = areas.includes('Dada')
-  const resultTitle = getResultTitle(isUrgent, intensity)
-  const recommendation = getRecommendation(isUrgent, intensity)
+  const hasChestArea = areas.includes('Dada') || areas.includes('Chest')
+  const resultTitle = getResultTitle(isUrgent, intensity, language)
+  const recommendation = getRecommendation(isUrgent, intensity, language)
   const medicineHandoff = useMemo(
-    () => (isUrgent ? null : createMedicineHandoff(areas, symptomContext, intensity, analysisResult)),
-    [analysisResult, areas, intensity, isUrgent, symptomContext],
+    () => (isUrgent ? null : createMedicineHandoff(areas, symptomContext, intensity, analysisResult, language)),
+    [analysisResult, areas, intensity, isUrgent, language, symptomContext],
   )
   const wellnessHandoff = useMemo(
-    () => createWellnessHandoff(areas, symptomContext, intensity, analysisResult),
-    [analysisResult, areas, intensity, symptomContext],
+    () => createWellnessHandoff(areas, symptomContext, intensity, analysisResult, language),
+    [analysisResult, areas, intensity, language, symptomContext],
   )
   const displayTitle = analysisResult?.title ?? resultTitle
   const displaySummary = analysisResult?.summary ?? trimmedSymptomText
@@ -120,6 +127,14 @@ function SymptomPage({
 
     writeStorageValue(storageKeys.symptomWorkspace, snapshot)
   }, [activeFlags, analysisResult, areas, duration, hasResult, intensity, symptomText])
+
+  useEffect(() => {
+    setDuration((current) => (durationOptions.includes(current) ? current : durationOptions[0]))
+    setAreas((current) => {
+      const validAreas = current.filter((item) => symptomAreas.includes(item))
+      return validAreas.length > 0 ? validAreas : [symptomAreas[0]]
+    })
+  }, [durationOptions, symptomAreas])
 
   function toggleArea(item: string) {
     resetAnalysis()
@@ -143,7 +158,7 @@ function SymptomPage({
 
   async function createResult() {
     if (trimmedSymptomText.length < 12) {
-      setFormError('Tulis keluhan sedikit lebih jelas dulu, minimal sekitar satu kalimat pendek.')
+      setFormError(copy.minError)
       setHasResult(false)
       return
     }
@@ -154,6 +169,7 @@ function SymptomPage({
       duration,
       intensity,
       flags: selectedFlagLabels,
+      language,
     }
 
     setIsAnalyzing(true)
@@ -170,7 +186,7 @@ function SymptomPage({
       setFormError('')
       setHasResult(true)
     } catch (error) {
-      setFormError(getGeminiAnalysisErrorMessage(error))
+      setFormError(getGeminiAnalysisErrorMessage(error, language))
       setAnalysisResult(null)
       setHasResult(false)
     } finally {
@@ -216,15 +232,12 @@ function SymptomPage({
 
   return (
     <main className="feature-page symptom-page" data-accent={feature.accent}>
-      <PageHero feature={feature} onNavigate={onNavigate} />
+      <PageHero feature={feature} language={language} onNavigate={onNavigate} />
 
       {isUrgent && (
         <section className="urgent-banner" role="alert">
           <AlertTriangle size={18} />
-          <span>
-            Ada kondisi prioritas yang perlu diperhatikan. Jika keluhan berat, memburuk cepat, atau
-            terasa darurat, prioritaskan bantuan medis langsung.
-          </span>
+          <span>{copy.urgentBanner}</span>
         </section>
       )}
 
@@ -233,17 +246,17 @@ function SymptomPage({
           <div className="interactive-panel symptom-input-panel">
             <div className="workspace-toolbar">
               <div>
-                <span className="eyebrow">Cerita gejala</span>
-                <h2>Detail singkat</h2>
+                <span className="eyebrow">{copy.storyEyebrow}</span>
+                <h2>{copy.storyTitle}</h2>
               </div>
               <div className="toolbar-actions">
-                <span className="soft-status">Bukan diagnosis</span>
+                <span className="soft-status">{copy.notDiagnosis}</span>
                 {hasWorkspaceContent && (
                   <button
-                    aria-label="Bersihkan form dan hasil"
+                    aria-label={copy.clearTitle}
                     className="icon-action quiet-danger"
                     onClick={clearCurrentWorkspace}
-                    title="Bersihkan form dan hasil"
+                    title={copy.clearTitle}
                     type="button"
                   >
                     <RotateCcw size={16} />
@@ -254,7 +267,7 @@ function SymptomPage({
 
             <div className="guided-form compact-guided-form">
               <label className="input-group" htmlFor="symptomText">
-                <span>Apa yang kamu rasakan?</span>
+                <span>{copy.whatFeel}</span>
                 <textarea
                   id="symptomText"
                   onChange={(event) => {
@@ -264,7 +277,7 @@ function SymptomPage({
                       setFormError('')
                     }
                   }}
-                  placeholder="Contoh: demam sejak kemarin, kepala berat, badan lemas..."
+                  placeholder={copy.symptomPlaceholder}
                   rows={4}
                   value={symptomText}
                 />
@@ -272,8 +285,8 @@ function SymptomPage({
 
               <section>
                 <div className="field-heading-row">
-                  <span className="field-caption">Area keluhan</span>
-                  <span className="mini-pill">{areas.length} dipilih</span>
+                  <span className="field-caption">{copy.area}</span>
+                  <span className="mini-pill">{areas.length} {copy.selected}</span>
                 </div>
                 <div className="option-grid compact">
                   {symptomAreas.map((item) => {
@@ -295,7 +308,7 @@ function SymptomPage({
               </section>
 
               <section>
-                <span className="field-caption">Durasi</span>
+                <span className="field-caption">{copy.duration}</span>
                 <div className="option-grid compact">
                   {durationOptions.map((item) => (
                     <button
@@ -315,8 +328,8 @@ function SymptomPage({
 
               <div className="range-field roomy">
                 <div>
-                  <span>Tingkat keluhan</span>
-                  <strong>{getIntensityLabel(intensity)}</strong>
+                  <span>{copy.intensity}</span>
+                  <strong>{getIntensityLabel(intensity, language)}</strong>
                 </div>
                 <input
                   aria-label="Tingkat keluhan"
@@ -333,8 +346,8 @@ function SymptomPage({
 
               <section>
                 <div className="field-heading-row">
-                  <span className="field-caption">Kondisi prioritas</span>
-                  <span className="mini-pill quiet">Opsional</span>
+                  <span className="field-caption">{copy.priority}</span>
+                  <span className="mini-pill quiet">{copy.optional}</span>
                 </div>
                 <div className="flag-grid">
                   {redFlags.map((flag) => {
@@ -363,7 +376,7 @@ function SymptomPage({
                 onClick={createResult}
                 type="button"
               >
-                {isAnalyzing ? 'Menganalisis dengan Gemini...' : 'Buat rangkuman awal'}
+                {isAnalyzing ? copy.analyzing : copy.createSummary}
               </button>
             </div>
           </div>
@@ -375,15 +388,15 @@ function SymptomPage({
             <div className="side-heading">
               <TimerReset size={19} />
               <div>
-                <span className="eyebrow">Hasil cepat</span>
-                <h3>Rangkuman awal</h3>
+                <span className="eyebrow">{copy.resultEyebrow}</span>
+                <h3>{copy.resultTitle}</h3>
               </div>
             </div>
 
             {hasWorkspaceContent && (
               <button className="secondary-button compact-button" onClick={clearCurrentWorkspace} type="button">
                 <RotateCcw size={15} />
-                Analisis baru
+                {copy.newAnalysis}
               </button>
             )}
           </div>
@@ -394,8 +407,8 @@ function SymptomPage({
                 <div className="side-heading">
                   <History size={19} />
                   <div>
-                    <span className="eyebrow">Riwayat lokal</span>
-                    <h3>Rangkuman terakhir</h3>
+                    <span className="eyebrow">{copy.historyEyebrow}</span>
+                    <h3>{copy.historyTitle}</h3>
                   </div>
                 </div>
                 <div className="history-actions">
@@ -404,13 +417,13 @@ function SymptomPage({
                     onClick={() => setShowHistory((current) => !current)}
                     type="button"
                   >
-                    {showHistory ? 'Sembunyikan' : 'Tampilkan'}
+                    {showHistory ? copy.hide : copy.show}
                   </button>
                   <button
-                    aria-label="Hapus semua riwayat gejala"
+                    aria-label={copy.deleteAllHistory}
                     className="icon-action quiet-danger"
                     onClick={() => setConfirmClearHistory((current) => !current)}
-                    title="Hapus semua riwayat gejala"
+                    title={copy.deleteAllHistory}
                     type="button"
                   >
                     <Trash2 size={16} />
@@ -420,12 +433,12 @@ function SymptomPage({
 
               {confirmClearHistory && (
                 <div className="history-confirm">
-                  <span>Hapus semua riwayat gejala?</span>
+                  <span>{copy.confirmClear}</span>
                   <button className="text-button compact-button" onClick={() => setConfirmClearHistory(false)} type="button">
-                    Batal
+                    {copy.cancel}
                   </button>
                   <button className="primary-button compact-button danger-button" onClick={clearAllHistory} type="button">
-                    Hapus
+                    {copy.delete}
                   </button>
                 </div>
               )}
@@ -441,9 +454,9 @@ function SymptomPage({
                         </span>
                       </div>
                       <div className="history-item-footer">
-                        <small>{formatShortDateTime(record.createdAt, 'Baru disimpan')}</small>
+                        <small>{formatShortDateTime(record.createdAt, copy.recordTimeFallback)}</small>
                         <button
-                          aria-label={`Hapus riwayat ${record.title}`}
+                          aria-label={`${copy.deleteRecordLabel} ${record.title}`}
                           className="icon-action tiny-danger"
                           onClick={() => onDeleteSymptomRecord(record.id)}
                           type="button"
@@ -471,29 +484,29 @@ function SymptomPage({
 
                 <div className="result-meta-row">
                   <span>
-                    <small>Area</small>
+                    <small>{copy.areaMeta}</small>
                     <b>{areaLabel}</b>
                   </span>
                   <span>
-                    <small>Durasi</small>
+                    <small>{copy.durationMeta}</small>
                     <b>{duration}</b>
                   </span>
                   <span>
-                    <small>Intensitas</small>
+                    <small>{copy.intensityMeta}</small>
                     <b>
-                      {intensity}/10, {getIntensityLabel(intensity).toLowerCase()}
+                      {intensity}/10, {getIntensityLabel(intensity, language).toLowerCase()}
                     </b>
                   </span>
                 </div>
 
                 <div className="result-recommendation">
-                  <span>Arahan utama</span>
+                  <span>{copy.mainAdvice}</span>
                   <p>{displayRecommendation}</p>
                 </div>
 
                 {analysisResult && (
                   <p className="ai-source-note">
-                    Dianalisis dengan Gemini API.
+                    {copy.geminiSource}
                   </p>
                 )}
                 {analysisResult?.safetyMessage && (
@@ -503,7 +516,7 @@ function SymptomPage({
                 {analysisResult && (
                   <div className="ai-detail-grid">
                     <section>
-                      <span>Langkah 24 jam</span>
+                      <span>{copy.careSteps}</span>
                       <ol>
                         {analysisResult.careSteps.map((item) => (
                           <li key={item}>{item}</li>
@@ -512,7 +525,7 @@ function SymptomPage({
                     </section>
 
                     <section>
-                      <span>Pantau berikutnya</span>
+                      <span>{copy.trackNext}</span>
                       <ol>
                         {analysisResult.questionsToTrack.map((item) => (
                           <li key={item}>{item}</li>
@@ -521,7 +534,7 @@ function SymptomPage({
                     </section>
 
                     <section>
-                      <span>Kapan cari bantuan</span>
+                      <span>{copy.seekHelp}</span>
                       <ol>
                         {analysisResult.doctorVisitAdvice.map((item) => (
                           <li key={item}>{item}</li>
@@ -537,8 +550,8 @@ function SymptomPage({
                       <button className="handoff-card medicine" onClick={saveToMedicine} type="button">
                         <Pill size={19} />
                         <span>
-                          <strong>Simpan ke Catatan Obat</strong>
-                          <small>Buat catatan obat umum yang aman untuk dipelajari.</small>
+                          <strong>{copy.saveMedicine}</strong>
+                          <small>{copy.saveMedicineHint}</small>
                         </span>
                         <ArrowRight size={17} />
                       </button>
@@ -546,11 +559,11 @@ function SymptomPage({
                       <article className="handoff-card quiet">
                         <AlertTriangle size={19} />
                         <span>
-                          <strong>Obat bukan langkah utama</strong>
+                          <strong>{copy.medicineNotMain}</strong>
                           <small>
                             {hasChestArea
-                              ? 'Karena ada keluhan dada, lebih aman fokus pada pemantauan dan konsultasi bila berlanjut.'
-                              : 'Untuk kondisi ini, ikuti arahan Gemini dan pantau perubahan keluhan terlebih dahulu.'}
+                              ? copy.chestMedicineHint
+                              : copy.medicineQuietHint}
                           </small>
                         </span>
                       </article>
@@ -559,11 +572,11 @@ function SymptomPage({
                     <button className="handoff-card wellness" onClick={saveToWellnessPlan} type="button">
                       <Leaf size={19} />
                       <span>
-                        <strong>Simpan ke Rencana Pulih</strong>
+                        <strong>{copy.savePlan}</strong>
                         <small>
                           {intensity <= 3
-                            ? 'Cocok kalau keluhan ringan dan lebih perlu dipantau.'
-                            : 'Tambahkan langkah kecil sambil memantau perubahan.'}
+                            ? copy.savePlanLight
+                            : copy.savePlanDefault}
                         </small>
                       </span>
                       <ArrowRight size={17} />
@@ -576,25 +589,23 @@ function SymptomPage({
             <div className="empty-result-state">
               <ClipboardCheck size={26} />
               <div>
-                <strong>Hasil analisis akan muncul di sini</strong>
-                <p>
-                  Isi detail singkat di panel kiri. Setelah dianalisis Gemini, area ini akan
-                  menyimpan rangkuman terakhir meski kamu pindah ke fitur lain.
-                </p>
+                <strong>{copy.emptyTitle}</strong>
+                <p>{copy.emptyBody}</p>
               </div>
             </div>
           )}
         </section>
 
         <div className="symptom-focus-slot">
-          <FocusPanel feature={feature} />
+          <FocusPanel feature={feature} language={language} />
         </div>
       </section>
     </main>
   )
 }
 
-function readSymptomWorkspace(): SymptomWorkspaceSnapshot {
+function readSymptomWorkspace(options: ReturnType<typeof getSymptomOptions>): SymptomWorkspaceSnapshot {
+  const { durationOptions, symptomAreas } = options
   const fallback: SymptomWorkspaceSnapshot = {
     symptomText: '',
     duration: durationOptions[0],
@@ -606,18 +617,20 @@ function readSymptomWorkspace(): SymptomWorkspaceSnapshot {
   }
 
   return readStorageValue(storageKeys.symptomWorkspace, fallback, (value) =>
-    normalizeSymptomWorkspace(value, fallback),
+    normalizeSymptomWorkspace(value, fallback, options),
   )
 }
 
 function normalizeSymptomWorkspace(
   value: unknown,
   fallback: SymptomWorkspaceSnapshot,
+  options: ReturnType<typeof getSymptomOptions>,
 ): SymptomWorkspaceSnapshot | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null
   }
 
+  const { durationOptions, redFlags, symptomAreas } = options
   const parsed = value as Partial<SymptomWorkspaceSnapshot>
   const storedAreas = Array.isArray(parsed.areas)
     ? parsed.areas.filter((item): item is string => symptomAreas.includes(item))
@@ -682,10 +695,13 @@ function buildSymptomContext(
   areas: string[],
   duration: string,
   intensity: number,
+  language: LanguageMode,
   summary?: string,
 ) {
-  const detail = summary?.trim() || symptomText.trim() || 'Detail gejala belum ditulis.'
-  return `${detail} Area: ${formatAreaList(areas)}. Durasi: ${duration}. Tingkat keluhan: ${intensity}/10.`
+  const copy = getUiCopy(language).symptom.handoff
+  const detail = summary?.trim() || symptomText.trim() || copy.noDetail
+
+  return `${detail} ${copy.area}: ${formatAreaList(areas, language)}. ${copy.duration}: ${duration}. ${copy.intensity}: ${intensity}/10.`
 }
 
 function createSymptomRecord(
@@ -709,35 +725,39 @@ function createSymptomRecord(
   }
 }
 
-function getResultTitle(isUrgent: boolean, intensity: number) {
+function getResultTitle(isUrgent: boolean, intensity: number, language: LanguageMode) {
+  const copy = getUiCopy(language).symptom
+
   if (isUrgent) {
-    return 'Perlu perhatian lebih'
+    return copy.urgentTitle
   }
 
   if (intensity <= 3) {
-    return 'Keluhan ringan, tetap pantau'
+    return copy.lightTitle
   }
 
-  return 'Masih bisa dipantau dengan hati-hati'
+  return copy.watchTitle
 }
 
-function getRecommendation(isUrgent: boolean, intensity: number) {
+function getRecommendation(isUrgent: boolean, intensity: number, language: LanguageMode) {
+  const copy = getUiCopy(language).symptom
+
   if (isUrgent) {
-    return 'Karena ada kondisi prioritas atau keluhan tinggi, sebaiknya cari bantuan medis lebih cepat.'
+    return copy.urgentRecommendation
   }
 
   if (intensity <= 3) {
-    return 'Pantau perubahan keluhan, jaga istirahat, dan catat bila ada gejala baru.'
+    return copy.lightRecommendation
   }
 
-  return 'Pantau perubahan keluhan dan cari bantuan medis jika memburuk, berlangsung lama, atau muncul kondisi prioritas.'
+  return copy.watchRecommendation
 }
 
-function formatAreaList(areas: string[]) {
+function formatAreaList(areas: string[], language: LanguageMode = 'id') {
   const cleanAreas = areas.map((item) => item.trim()).filter(Boolean)
 
   if (cleanAreas.length === 0) {
-    return 'Area belum dipilih'
+    return getUiCopy(language).symptom.noArea
   }
 
   if (cleanAreas.length === 1) {
@@ -745,10 +765,12 @@ function formatAreaList(areas: string[]) {
   }
 
   if (cleanAreas.length === 2) {
-    return `${cleanAreas[0]} dan ${cleanAreas[1]}`
+    return language === 'en' ? `${cleanAreas[0]} and ${cleanAreas[1]}` : `${cleanAreas[0]} dan ${cleanAreas[1]}`
   }
 
-  return `${cleanAreas.slice(0, -1).join(', ')}, dan ${cleanAreas[cleanAreas.length - 1]}`
+  return language === 'en'
+    ? `${cleanAreas.slice(0, -1).join(', ')}, and ${cleanAreas[cleanAreas.length - 1]}`
+    : `${cleanAreas.slice(0, -1).join(', ')}, dan ${cleanAreas[cleanAreas.length - 1]}`
 }
 
 function formatRecordAreas(record: SavedSymptomRecord) {
@@ -767,31 +789,33 @@ function createMedicineHandoff(
   context: string,
   intensity: number,
   analysis?: SymptomAiResult | null,
+  language: LanguageMode = 'id',
 ): SaveMedicineNoteInput | null {
-  if (areas.includes('Dada')) {
+  if (areas.includes('Dada') || areas.includes('Chest')) {
     return null
   }
 
-  const areaLabel = formatAreaList(areas).toLowerCase()
+  const copy = getUiCopy(language).symptom.handoff
+  const areaLabel = formatAreaList(areas, language).toLowerCase()
   const guidance =
     analysis?.medicineNote && analysis.medicineNote.length > 0
       ? analysis.medicineNote
       : [
-          'Pelajari kategori obat bebas yang sesuai keluhan, bukan langsung memilih merek tertentu.',
-          'Cek label: aturan pakai, peringatan, kontraindikasi, interaksi, dan kedaluwarsa.',
+          copy.medicineFallback[0],
+          copy.medicineFallback[1],
           intensity >= 6
-            ? 'Karena keluhan cukup terasa, siapkan pertanyaan untuk apoteker atau dokter sebelum memakai obat.'
-            : 'Kalau keluhan ringan, pertimbangkan dulu pemantauan dan perawatan mandiri sederhana.',
+            ? copy.medicineFallbackHigh
+            : copy.medicineFallback[2],
         ]
 
   return {
     source: 'Gejala',
-    title: `Catatan obat umum untuk keluhan ${areaLabel}`,
+    title: `${copy.medicineTitlePrefix} ${areaLabel}`,
     context,
     guidance,
     safety:
       analysis?.safetyMessage ||
-      'Sehatara tidak memberi dosis personal, resep, atau instruksi mengganti obat dokter.',
+      copy.medicineSafety,
   }
 }
 
@@ -800,23 +824,25 @@ function createWellnessHandoff(
   context: string,
   intensity: number,
   analysis?: SymptomAiResult | null,
+  language: LanguageMode = 'id',
 ): SaveWellnessPlanInput {
+  const copy = getUiCopy(language).symptom.handoff
   const firstStep =
     intensity <= 3
-      ? 'Pantau keluhan hari ini dan catat apakah membaik, menetap, atau bertambah.'
-      : 'Kurangi aktivitas berat sementara dan pantau apakah keluhan memburuk.'
+      ? copy.firstStepLight
+      : copy.firstStepDefault
   const steps =
     analysis?.recoveryPlan && analysis.recoveryPlan.length > 0
       ? analysis.recoveryPlan
       : [
           firstStep,
-          'Cukupi minum, makan ringan bila memungkinkan, dan istirahat secukupnya.',
-          'Cari bantuan medis bila muncul kondisi prioritas, keluhan makin berat, atau berlangsung lama.',
+          copy.recoveryFallback[0],
+          copy.recoveryFallback[1],
         ]
 
   return {
     source: 'Gejala',
-    title: `Rencana ringan untuk keluhan ${formatAreaList(areas).toLowerCase()}`,
+    title: `${copy.planTitlePrefix} ${formatAreaList(areas, language).toLowerCase()}`,
     context,
     steps,
   }

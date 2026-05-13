@@ -10,6 +10,7 @@ export const storageKeys = {
   medicineNoteProgress: 'sehatara-medicine-note-progress',
   wellnessPlanProgress: 'sehatara-wellness-plan-progress',
   calmSessionRecords: 'sehatara-calm-session-records',
+  language: 'sehatara-language',
 } as const
 
 export const storageLimits = {

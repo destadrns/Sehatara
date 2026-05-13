@@ -4,13 +4,15 @@ import type { FormEvent } from 'react'
 import AssistantMessageBubble from '../components/common/AssistantMessageBubble'
 import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
-import { chatStarterPrompts } from '../data/chatData'
+import { getChatStarterPrompts } from '../data/chatData'
+import { getUiCopy } from '../i18n/uiCopy'
 import type {
   AssistantMessage,
   ChatAiResult,
   ChatHistoryItem,
   ChatMessage,
   FeatureConfig,
+  LanguageMode,
   PageId,
   SaveMedicineNoteInput,
   SaveWellnessPlanInput,
@@ -28,6 +30,7 @@ import {
 
 type ChatPageProps = {
   feature: FeatureConfig
+  language: LanguageMode
   onNavigate: (page: PageId) => void
   onSaveMedicineNote: (note: SaveMedicineNoteInput) => void
   onSaveWellnessPlan: (plan: SaveWellnessPlanInput) => void
@@ -35,11 +38,14 @@ type ChatPageProps = {
 
 function ChatPage({
   feature,
+  language,
   onNavigate,
   onSaveMedicineNote,
   onSaveWellnessPlan,
 }: ChatPageProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(readStoredChatMessages)
+  const copy = getUiCopy(language).chat
+  const starterPrompts = getChatStarterPrompts(language)
+  const [messages, setMessages] = useState<ChatMessage[]>(() => readStoredChatMessages(language))
   const [draft, setDraft] = useState('')
   const [isThinking, setIsThinking] = useState(false)
   const [chatError, setChatError] = useState('')
@@ -75,20 +81,21 @@ function ChatPage({
       const result = await askGeminiChat({
         message: trimmedDraft,
         history: buildChatHistory(messages),
+        language,
       })
 
       setMessages((current) => [...current, createGeminiChatMessage(trimmedDraft, result)])
     } catch (error) {
-      const message = getGeminiChatErrorMessage(error)
+      const message = getGeminiChatErrorMessage(error, language)
       setChatError(message)
-      setMessages((current) => [...current, createChatErrorMessage(message)])
+      setMessages((current) => [...current, createChatErrorMessage(message, language)])
     } finally {
       setIsThinking(false)
     }
   }
 
   function startNewChat() {
-    setMessages([createIntroMessage()])
+    setMessages([createIntroMessage(language)])
     setDraft('')
     setChatError('')
   }
@@ -98,7 +105,7 @@ function ChatPage({
       return
     }
 
-    onSaveMedicineNote(createChatMedicineHandoff(lastGeminiMessage))
+    onSaveMedicineNote(createChatMedicineHandoff(lastGeminiMessage, language))
     onNavigate('medicine')
   }
 
@@ -107,23 +114,23 @@ function ChatPage({
       return
     }
 
-    onSaveWellnessPlan(createChatWellnessHandoff(lastGeminiMessage))
+    onSaveWellnessPlan(createChatWellnessHandoff(lastGeminiMessage, language))
     onNavigate('preventive')
   }
 
   return (
     <main className="feature-page chat-page" data-accent={feature.accent}>
-      <PageHero feature={feature} onNavigate={onNavigate} />
+      <PageHero feature={feature} language={language} onNavigate={onNavigate} />
 
       <section className="feature-workspace chat-workspace">
         <div className="workspace-main">
           <div className="workspace-toolbar">
             <div>
-              <span className="eyebrow">Ruang chat khusus</span>
-              <h2>Tanya Sehatara</h2>
+              <span className="eyebrow">{copy.workspaceEyebrow}</span>
+              <h2>{copy.workspaceTitle}</h2>
             </div>
             <div className="chat-toolbar-actions">
-              {hasActiveSession && <span className="soft-status">Sesi tersimpan</span>}
+              {hasActiveSession && <span className="soft-status">{copy.savedSession}</span>}
               <button
                 className="text-button compact-button"
                 disabled={isThinking}
@@ -131,13 +138,13 @@ function ChatPage({
                 type="button"
               >
                 <RotateCcw size={15} />
-                Chat baru
+                {copy.newChat}
               </button>
             </div>
           </div>
 
-          <div className="starter-row" aria-label="Contoh pertanyaan chat">
-            {chatStarterPrompts.map((prompt) => (
+          <div className="starter-row" aria-label={copy.starterAria}>
+            {starterPrompts.map((prompt) => (
               <button
                 key={prompt}
                 onClick={() => {
@@ -158,7 +165,7 @@ function ChatPage({
                   <p>{message.body}</p>
                 </article>
               ) : (
-                <AssistantMessageBubble key={message.id} message={message} />
+                <AssistantMessageBubble key={message.id} language={language} message={message} />
               ),
             )}
 
@@ -178,20 +185,20 @@ function ChatPage({
           </div>
 
           <form className="feature-composer" onSubmit={submitChat}>
-            <label htmlFor="chatInput">Tulis pertanyaanmu</label>
+            <label htmlFor="chatInput">{copy.inputLabel}</label>
             <textarea
               id="chatInput"
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Contoh: Apa yang perlu saya siapkan sebelum konsultasi ke dokter?"
+              placeholder={copy.placeholder}
               rows={4}
               value={draft}
               disabled={isThinking}
             />
             {chatError && <p className="form-alert">{chatError}</p>}
             <div className="composer-actions">
-              <span>Jawaban diambil dari Gemini API untuk edukasi awal, bukan diagnosis atau resep.</span>
+              <span>{copy.disclaimer}</span>
               <button disabled={!draft.trim() || isThinking} type="submit">
-                {isThinking ? 'Meminta Gemini...' : 'Kirim'}
+                {isThinking ? copy.thinking : copy.send}
                 <ArrowUp size={17} />
               </button>
             </div>
@@ -199,31 +206,28 @@ function ChatPage({
         </div>
 
         <aside className="workspace-side">
-          <FocusPanel feature={feature} />
+          <FocusPanel feature={feature} language={language} />
           <section className="side-panel">
             <div className="side-heading">
               <Bot size={19} />
               <div>
-                <span className="eyebrow">Kapan pakai chat?</span>
-                <h3>Saat pertanyaanmu campuran</h3>
+                <span className="eyebrow">{copy.usageEyebrow}</span>
+                <h3>{copy.usageTitle}</h3>
               </div>
             </div>
-            <p className="muted-copy">
-              Gunakan chat untuk pertanyaan umum. Percakapan terakhir tetap tersimpan di perangkat ini
-              saat kamu pindah fitur. Pakai Chat baru kalau ingin mulai dari awal.
-            </p>
+            <p className="muted-copy">{copy.usageBody}</p>
 
             {lastGeminiMessage && !isThinking && (
               <div className="chat-handoff">
-                <span className="eyebrow">Bawa ke fitur lain</span>
+                <span className="eyebrow">{copy.handoffEyebrow}</span>
                 <button className="handoff-mini medicine" onClick={saveChatMedicineNote} type="button">
                   <Pill size={17} />
-                  <span>Simpan catatan obat</span>
+                  <span>{copy.saveMedicine}</span>
                   <ArrowRight size={15} />
                 </button>
                 <button className="handoff-mini wellness" onClick={saveChatWellnessPlan} type="button">
                   <Leaf size={17} />
-                  <span>Simpan rencana sehat</span>
+                  <span>{copy.savePlan}</span>
                   <ArrowRight size={15} />
                 </button>
               </div>
@@ -235,23 +239,20 @@ function ChatPage({
   )
 }
 
-function createIntroMessage(): ChatMessage {
+function createIntroMessage(language: LanguageMode): ChatMessage {
+  const copy = getUiCopy(language).chat
+
   return {
     id: createId(),
     role: 'assistant',
-    title: 'Halo, saya Sehatara',
-    body:
-      'Ruang ini khusus untuk tanya bebas. Saya akan menjaga jawaban tetap edukatif, sederhana, dan tidak menggantikan tenaga medis.',
-    points: [
-      'Tulis pertanyaan dengan bahasa biasa.',
-      'Jangan masukkan data pribadi sensitif.',
-      'Untuk tanda bahaya, cari bantuan medis langsung.',
-    ],
-    nextStep: 'Pilih contoh pertanyaan atau tulis pertanyaanmu sendiri.',
+    title: copy.introTitle,
+    body: copy.introBody,
+    points: [...copy.introPoints],
+    nextStep: copy.introNext,
   }
 }
 
-function readStoredChatMessages(): ChatMessage[] {
+function readStoredChatMessages(language: LanguageMode): ChatMessage[] {
   const restoredMessages = readStorageValue<ChatMessage[]>(storageKeys.chatSession, [], (value) => {
     if (!Array.isArray(value)) {
       return null
@@ -262,7 +263,7 @@ function readStoredChatMessages(): ChatMessage[] {
       .filter((item): item is ChatMessage => Boolean(item))
   })
 
-  return restoredMessages.length > 0 ? restoredMessages : [createIntroMessage()]
+  return restoredMessages.length > 0 ? restoredMessages : [createIntroMessage(language)]
 }
 
 function normalizeStoredChatMessage(value: unknown): ChatMessage | null {
@@ -333,19 +334,17 @@ function createGeminiChatMessage(input: string, result: ChatAiResult): Assistant
   }
 }
 
-function createChatErrorMessage(errorMessage: string): AssistantMessage {
+function createChatErrorMessage(errorMessage: string, language: LanguageMode): AssistantMessage {
+  const copy = getUiCopy(language).chat
+
   return {
     id: createId(),
     role: 'assistant',
-    title: 'Gemini belum bisa menjawab',
+    title: copy.errorTitle,
     body: errorMessage,
-    points: [
-      'Tidak ada jawaban AI yang dibuat untuk pertanyaan ini.',
-      'Pastikan API key, koneksi internet, dan server lokal masih aktif.',
-      'Kirim ulang pertanyaan setelah konfigurasi siap.',
-    ],
-    warning: 'Fitur Tanya AI membutuhkan respons Gemini agar hasilnya valid.',
-    nextStep: 'Coba kirim ulang setelah server dan Gemini API aktif.',
+    points: [...copy.errorPoints],
+    warning: copy.errorWarning,
+    nextStep: copy.errorNext,
   }
 }
 
@@ -369,18 +368,25 @@ function isGeminiAssistantMessage(message: ChatMessage): message is AssistantMes
   return message.role === 'assistant' && message.source === 'gemini'
 }
 
-function getHandoffContext(message: AssistantMessage) {
+function getHandoffContext(message: AssistantMessage, language: LanguageMode) {
+  const copy = getUiCopy(language).chat
+
   return (
     message.handoffSummary ||
-    `${message.relatedUserInput ?? 'Pertanyaan chat'} ${message.body}`.trim()
+    `${message.relatedUserInput ?? copy.fallbackContext} ${message.body}`.trim()
   )
 }
 
-function createChatMedicineHandoff(message: AssistantMessage): SaveMedicineNoteInput {
+function createChatMedicineHandoff(
+  message: AssistantMessage,
+  language: LanguageMode,
+): SaveMedicineNoteInput {
+  const copy = getUiCopy(language).chat
+
   return {
     source: 'Tanya AI',
-    title: `Catatan obat dari ${message.title}`,
-    context: getHandoffContext(message),
+    title: `${copy.medicineTitlePrefix} ${message.title}`,
+    context: getHandoffContext(message, language),
     guidance:
       message.medicineNote && message.medicineNote.length > 0
         ? message.medicineNote
@@ -388,15 +394,20 @@ function createChatMedicineHandoff(message: AssistantMessage): SaveMedicineNoteI
     safety:
       message.safetyMessage ||
       message.warning ||
-      'Sehatara tidak memberi dosis personal, merek wajib, atau keputusan mengganti obat dokter.',
+      copy.medicineSafety,
   }
 }
 
-function createChatWellnessHandoff(message: AssistantMessage): SaveWellnessPlanInput {
+function createChatWellnessHandoff(
+  message: AssistantMessage,
+  language: LanguageMode,
+): SaveWellnessPlanInput {
+  const copy = getUiCopy(language).chat
+
   return {
     source: 'Tanya AI',
-    title: `Rencana sehat dari ${message.title}`,
-    context: getHandoffContext(message),
+    title: `${copy.planTitlePrefix} ${message.title}`,
+    context: getHandoffContext(message, language),
     steps:
       message.recoveryPlan && message.recoveryPlan.length > 0
         ? message.recoveryPlan

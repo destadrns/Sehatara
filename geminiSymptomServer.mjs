@@ -164,6 +164,7 @@ function getGeminiRequestFailure(detail, status) {
 }
 
 function buildSymptomPrompt(input) {
+  const outputLanguage = input.language === 'en' ? 'English' : 'Bahasa Indonesia'
   const areas = Array.isArray(input.areas) && input.areas.length > 0
     ? input.areas.join(', ')
     : input.area || 'Tidak disebutkan'
@@ -174,6 +175,7 @@ function buildSymptomPrompt(input) {
 Kamu adalah asisten edukasi kesehatan awal untuk aplikasi Sehatara.
 
 Tugas:
+- Tulis semua field JSON dalam ${outputLanguage}.
 - Berikan analisis edukatif yang terasa personal, bernilai, dan tidak seperti template.
 - Rangkum pola keluhan user dengan bahasa yang hangat, jelas, dan cukup lengkap.
 - Jelaskan kemungkinan kategori umum secara hati-hati bila relevan, misalnya infeksi ringan, masalah pencernaan, kelelahan, dehidrasi, kurang tidur, atau iritasi. Jangan menyatakan diagnosis final.
@@ -264,12 +266,14 @@ function buildSymptomResponseSchema() {
 function buildChatPrompt(input) {
   const message = typeof input.message === 'string' ? input.message.trim() : ''
   const recentHistory = formatChatHistory(input.history)
+  const outputLanguage = input.language === 'en' ? 'English' : 'Bahasa Indonesia'
 
   return `
 Kamu adalah Sehatara, asisten AI edukasi kesehatan awal untuk pengguna umum.
 
 Tugas:
-- Jawab pertanyaan terbaru dengan bahasa Indonesia yang hangat, natural, dan mudah dipahami keluarga di rumah.
+- Tulis semua field JSON dalam ${outputLanguage}.
+- Jawab pertanyaan terbaru dengan bahasa yang hangat, natural, dan mudah dipahami keluarga di rumah.
 - Jawaban harus terasa membantu, bukan template kosong.
 - Fokus pada edukasi awal, persiapan informasi, pemantauan, pertanyaan untuk tenaga kesehatan, dan langkah ringan yang aman.
 - Jangan memberi diagnosis final, resep, dosis personal, merek obat wajib, atau instruksi mengganti obat dokter.

@@ -6,6 +6,8 @@ export type PageId = 'home' | FeatureId
 
 export type ThemeMode = 'light' | 'dark'
 
+export type LanguageMode = 'id' | 'en'
+
 export type FeatureConfig = {
   id: FeatureId
   label: string
@@ -58,6 +60,7 @@ export type SymptomAiInput = {
   duration: string
   intensity: number
   flags: string[]
+  language?: LanguageMode
 }
 
 export type SymptomAiResult = {
@@ -83,6 +86,7 @@ export type ChatHistoryItem = {
 export type ChatAiInput = {
   message: string
   history: ChatHistoryItem[]
+  language?: LanguageMode
 }
 
 export type ChatAiResult = {
