@@ -15,6 +15,13 @@ import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
 import { medicineChecklist, medicineTopics } from '../data/medicineData'
 import type { FeatureConfig, PageId, SavedMedicineNote } from '../types/sehatara'
+import {
+  normalizeDateString,
+  normalizeStringList,
+  readStorageRecordMap,
+  storageKeys,
+  writeStorageValue,
+} from '../utils/storage'
 
 type MedicinePageProps = {
   feature: FeatureConfig
@@ -29,8 +36,6 @@ type MedicineNoteProgress = {
   personalNote: string
   checkedAt?: string
 }
-
-const MEDICINE_NOTE_PROGRESS_KEY = 'sehatara-medicine-note-progress'
 
 function MedicinePage({
   feature,
@@ -68,7 +73,7 @@ function MedicinePage({
   ).length
 
   useEffect(() => {
-    window.localStorage.setItem(MEDICINE_NOTE_PROGRESS_KEY, JSON.stringify(noteProgressById))
+    writeStorageValue(storageKeys.medicineNoteProgress, noteProgressById)
   }, [noteProgressById])
 
   useEffect(() => {
@@ -511,34 +516,7 @@ function createEmptyMedicineNoteProgress(): MedicineNoteProgress {
 }
 
 function readMedicineNoteProgress(): Record<string, MedicineNoteProgress> {
-  const stored = window.localStorage.getItem(MEDICINE_NOTE_PROGRESS_KEY)
-
-  if (!stored) {
-    return {}
-  }
-
-  try {
-    const parsed = JSON.parse(stored)
-
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {}
-    }
-
-    return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, MedicineNoteProgress>>(
-      (progressMap, [id, value]) => {
-        const progress = normalizeMedicineNoteProgress(value)
-
-        if (progress) {
-          progressMap[id] = progress
-        }
-
-        return progressMap
-      },
-      {},
-    )
-  } catch {
-    return {}
-  }
+  return readStorageRecordMap(storageKeys.medicineNoteProgress, normalizeMedicineNoteProgress)
 }
 
 function normalizeMedicineNoteProgress(value: unknown): MedicineNoteProgress | null {
@@ -547,17 +525,9 @@ function normalizeMedicineNoteProgress(value: unknown): MedicineNoteProgress | n
   }
 
   const progress = value as Record<string, unknown>
-  const understood = Array.isArray(progress.understood)
-    ? progress.understood
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : []
+  const understood = normalizeStringList(progress.understood)
   const personalNote = typeof progress.personalNote === 'string' ? progress.personalNote : ''
-  const checkedAt =
-    typeof progress.checkedAt === 'string' && !Number.isNaN(new Date(progress.checkedAt).getTime())
-      ? progress.checkedAt
-      : undefined
+  const checkedAt = normalizeDateString(progress.checkedAt)
 
   return {
     understood,

@@ -18,22 +18,26 @@ import type {
   ThemeMode,
 } from '../types/sehatara'
 import { createId } from '../utils/assistantResponses'
-
-const SYMPTOM_STORAGE_KEY = 'sehatara-symptom-records'
-const MEDICINE_STORAGE_KEY = 'sehatara-medicine-notes'
-const WELLNESS_STORAGE_KEY = 'sehatara-wellness-plans'
+import {
+  readStorageList,
+  readStorageText,
+  storageKeys,
+  storageLimits,
+  writeStorageText,
+  writeStorageValue,
+} from '../utils/storage'
 
 function App() {
   const [page, setPage] = useState<PageId>(getInitialPage)
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme)
   const [symptomRecords, setSymptomRecords] = useState<SavedSymptomRecord[]>(() =>
-    readStoredItems<SavedSymptomRecord>(SYMPTOM_STORAGE_KEY),
+    readStorageList<SavedSymptomRecord>(storageKeys.symptomRecords),
   )
   const [medicineNotes, setMedicineNotes] = useState<SavedMedicineNote[]>(() =>
-    readStoredItems<SavedMedicineNote>(MEDICINE_STORAGE_KEY),
+    readStorageList<SavedMedicineNote>(storageKeys.medicineNotes),
   )
   const [wellnessPlans, setWellnessPlans] = useState<SavedWellnessPlan[]>(() =>
-    readStoredItems<SavedWellnessPlan>(WELLNESS_STORAGE_KEY),
+    readStorageList<SavedWellnessPlan>(storageKeys.wellnessPlans),
   )
 
   const selectedFeature = useMemo(
@@ -43,19 +47,19 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    window.localStorage.setItem('sehatara-theme', theme)
+    writeStorageText(storageKeys.theme, theme)
   }, [theme])
 
   useEffect(() => {
-    window.localStorage.setItem(MEDICINE_STORAGE_KEY, JSON.stringify(medicineNotes))
+    writeStorageValue(storageKeys.medicineNotes, medicineNotes)
   }, [medicineNotes])
 
   useEffect(() => {
-    window.localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords))
+    writeStorageValue(storageKeys.symptomRecords, symptomRecords)
   }, [symptomRecords])
 
   useEffect(() => {
-    window.localStorage.setItem(WELLNESS_STORAGE_KEY, JSON.stringify(wellnessPlans))
+    writeStorageValue(storageKeys.wellnessPlans, wellnessPlans)
   }, [wellnessPlans])
 
   useEffect(() => {
@@ -85,7 +89,7 @@ function App() {
     setMedicineNotes((current) => [
       { ...note, id: createId(), createdAt: new Date().toISOString() },
       ...current,
-    ].slice(0, 6))
+    ].slice(0, storageLimits.medicineNotes))
   }
 
   function deleteMedicineNote(id: string) {
@@ -100,7 +104,7 @@ function App() {
     setSymptomRecords((current) => [
       { ...record, id: createId(), createdAt: new Date().toISOString() },
       ...current,
-    ].slice(0, 8))
+    ].slice(0, storageLimits.symptomRecords))
   }
 
   function deleteSymptomRecord(id: string) {
@@ -115,7 +119,7 @@ function App() {
     setWellnessPlans((current) => [
       { ...plan, id: createId(), createdAt: new Date().toISOString() },
       ...current,
-    ].slice(0, 6))
+    ].slice(0, storageLimits.wellnessPlans))
   }
 
   function deleteWellnessPlan(id: string) {
@@ -238,7 +242,7 @@ function getInitialPage(): PageId {
 }
 
 function getInitialTheme(): ThemeMode {
-  const savedTheme = window.localStorage.getItem('sehatara-theme')
+  const savedTheme = readStorageText(storageKeys.theme)
 
   if (savedTheme === 'dark' || savedTheme === 'light') {
     return savedTheme
@@ -246,20 +250,4 @@ function getInitialTheme(): ThemeMode {
 
   return 'light'
 }
-
-function readStoredItems<T>(key: string): T[] {
-  const stored = window.localStorage.getItem(key)
-
-  if (!stored) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(stored)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
 export default App

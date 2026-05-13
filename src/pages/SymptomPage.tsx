@@ -26,6 +26,7 @@ import type {
 } from '../types/sehatara'
 import { analyzeSymptom, getGeminiAnalysisErrorMessage } from '../utils/geminiSymptomAnalysis'
 import { getIntensityLabel } from '../utils/assistantResponses'
+import { readStorageValue, removeStorageValue, storageKeys, writeStorageValue } from '../utils/storage'
 
 type SymptomPageProps = {
   feature: FeatureConfig
@@ -47,8 +48,6 @@ type SymptomWorkspaceSnapshot = {
   hasResult: boolean
   analysisResult: SymptomAiResult | null
 }
-
-const SYMPTOM_WORKSPACE_KEY = 'sehatara-symptom-workspace'
 
 function SymptomPage({
   feature,
@@ -118,7 +117,7 @@ function SymptomPage({
       analysisResult,
     }
 
-    window.localStorage.setItem(SYMPTOM_WORKSPACE_KEY, JSON.stringify(snapshot))
+    writeStorageValue(storageKeys.symptomWorkspace, snapshot)
   }, [activeFlags, analysisResult, areas, duration, hasResult, intensity, symptomText])
 
   function toggleArea(item: string) {
@@ -192,7 +191,7 @@ function SymptomPage({
     setAnalysisResult(null)
     setHasResult(false)
     setFormError('')
-    window.localStorage.removeItem(SYMPTOM_WORKSPACE_KEY)
+    removeStorageValue(storageKeys.symptomWorkspace)
   }
 
   function clearAllHistory() {
@@ -604,43 +603,47 @@ function readSymptomWorkspace(): SymptomWorkspaceSnapshot {
     hasResult: false,
     analysisResult: null,
   }
-  const stored = window.localStorage.getItem(SYMPTOM_WORKSPACE_KEY)
 
-  if (!stored) {
-    return fallback
+  return readStorageValue(storageKeys.symptomWorkspace, fallback, (value) =>
+    normalizeSymptomWorkspace(value, fallback),
+  )
+}
+
+function normalizeSymptomWorkspace(
+  value: unknown,
+  fallback: SymptomWorkspaceSnapshot,
+): SymptomWorkspaceSnapshot | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
   }
 
-  try {
-    const parsed = JSON.parse(stored) as Partial<SymptomWorkspaceSnapshot>
-    const storedAreas = Array.isArray(parsed.areas)
-      ? parsed.areas.filter((item): item is string => symptomAreas.includes(item))
-      : []
-    const storedFlags = Array.isArray(parsed.activeFlags)
-      ? parsed.activeFlags.filter((item): item is string =>
-          redFlags.some((flag) => flag.id === item),
-        )
-      : []
-    const storedAnalysis = isSymptomAiResult(parsed.analysisResult)
-      ? parsed.analysisResult
-      : null
+  const parsed = value as Partial<SymptomWorkspaceSnapshot>
+  const storedAreas = Array.isArray(parsed.areas)
+    ? parsed.areas.filter((item): item is string => symptomAreas.includes(item))
+    : []
+  const storedFlags = Array.isArray(parsed.activeFlags)
+    ? parsed.activeFlags.filter((item): item is string =>
+        redFlags.some((flag) => flag.id === item),
+      )
+    : []
+  const storedAnalysis = isSymptomAiResult(parsed.analysisResult)
+    ? parsed.analysisResult
+    : null
 
-    return {
-      symptomText: typeof parsed.symptomText === 'string' ? parsed.symptomText : fallback.symptomText,
-      duration:
-        typeof parsed.duration === 'string' && durationOptions.includes(parsed.duration)
-          ? parsed.duration
-          : fallback.duration,
-      areas: storedAreas.length > 0 ? storedAreas : fallback.areas,
-      intensity:
-        typeof parsed.intensity === 'number' && parsed.intensity >= 1 && parsed.intensity <= 10
-          ? parsed.intensity
-          : fallback.intensity,
-      activeFlags: storedFlags,
-      hasResult: Boolean(parsed.hasResult && storedAnalysis),
-      analysisResult: storedAnalysis,
-    }
-  } catch {
-    return fallback
+  return {
+    symptomText: typeof parsed.symptomText === 'string' ? parsed.symptomText : fallback.symptomText,
+    duration:
+      typeof parsed.duration === 'string' && durationOptions.includes(parsed.duration)
+        ? parsed.duration
+        : fallback.duration,
+    areas: storedAreas.length > 0 ? storedAreas : fallback.areas,
+    intensity:
+      typeof parsed.intensity === 'number' && parsed.intensity >= 1 && parsed.intensity <= 10
+        ? parsed.intensity
+        : fallback.intensity,
+    activeFlags: storedFlags,
+    hasResult: Boolean(parsed.hasResult && storedAnalysis),
+    analysisResult: storedAnalysis,
   }
 }
 

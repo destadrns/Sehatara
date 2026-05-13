@@ -5,6 +5,13 @@ import PageHero from '../components/common/PageHero'
 import { breathingSteps, groundingSteps } from '../data/mentalData'
 import type { FeatureConfig, PageId } from '../types/sehatara'
 import { createId } from '../utils/assistantResponses'
+import {
+  normalizeDateString,
+  readStorageList,
+  storageKeys,
+  storageLimits,
+  writeStorageValue,
+} from '../utils/storage'
 
 type MentalPageProps = {
   feature: FeatureConfig
@@ -30,8 +37,6 @@ type CalmSessionRecord = {
   mood: number
   createdAt: string
 }
-
-const CALM_SESSION_RECORDS_KEY = 'sehatara-calm-session-records'
 
 const calmSessionOptions: CalmSessionConfig[] = [
   {
@@ -73,7 +78,7 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
   const groundingCount = sessionRecords.filter((record) => record.mode === 'grounding').length
 
   useEffect(() => {
-    window.localStorage.setItem(CALM_SESSION_RECORDS_KEY, JSON.stringify(sessionRecords.slice(0, 20)))
+    writeStorageValue(storageKeys.calmSessionRecords, sessionRecords.slice(0, storageLimits.calmSessionRecords))
   }, [sessionRecords])
 
   useEffect(() => {
@@ -130,7 +135,7 @@ function MentalPage({ feature, onNavigate }: MentalPageProps) {
 
     setIsRunning(false)
     setRemainingSeconds(activeSession.durationSeconds)
-    setSessionRecords((current) => [record, ...current].slice(0, 20))
+    setSessionRecords((current) => [record, ...current].slice(0, storageLimits.calmSessionRecords))
   }
 
   function deleteSessionRecord(id: string) {
@@ -316,26 +321,11 @@ function formatDuration(seconds: number) {
 }
 
 function readCalmSessionRecords(): CalmSessionRecord[] {
-  const stored = window.localStorage.getItem(CALM_SESSION_RECORDS_KEY)
-
-  if (!stored) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(stored)
-
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-
-    return parsed
-      .map((item): CalmSessionRecord | null => normalizeCalmSessionRecord(item))
-      .filter((item): item is CalmSessionRecord => Boolean(item))
-      .slice(0, 20)
-  } catch {
-    return []
-  }
+  return readStorageList(
+    storageKeys.calmSessionRecords,
+    normalizeCalmSessionRecord,
+    storageLimits.calmSessionRecords,
+  )
 }
 
 function normalizeCalmSessionRecord(value: unknown): CalmSessionRecord | null {
@@ -345,9 +335,7 @@ function normalizeCalmSessionRecord(value: unknown): CalmSessionRecord | null {
 
   const record = value as Partial<CalmSessionRecord>
   const mode = record.mode === 'breathing' || record.mode === 'grounding' ? record.mode : null
-  const createdAt = typeof record.createdAt === 'string' && !Number.isNaN(new Date(record.createdAt).getTime())
-    ? record.createdAt
-    : null
+  const createdAt = normalizeDateString(record.createdAt)
 
   if (!mode || !createdAt) {
     return null

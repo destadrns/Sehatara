@@ -17,6 +17,14 @@ import type {
 } from '../types/sehatara'
 import { createId } from '../utils/assistantResponses'
 import { askGeminiChat, getGeminiChatErrorMessage } from '../utils/geminiChat'
+import {
+  normalizeOptionalStringList,
+  normalizeStringList,
+  normalizeText,
+  readStorageValue,
+  storageKeys,
+  writeStorageValue,
+} from '../utils/storage'
 
 type ChatPageProps = {
   feature: FeatureConfig
@@ -24,8 +32,6 @@ type ChatPageProps = {
   onSaveMedicineNote: (note: SaveMedicineNoteInput) => void
   onSaveWellnessPlan: (plan: SaveWellnessPlanInput) => void
 }
-
-const CHAT_SESSION_KEY = 'sehatara-chat-session'
 
 function ChatPage({
   feature,
@@ -46,7 +52,7 @@ function ChatPage({
   }, [messages, isThinking])
 
   useEffect(() => {
-    window.localStorage.setItem(CHAT_SESSION_KEY, JSON.stringify(messages))
+    writeStorageValue(storageKeys.chatSession, messages)
   }, [messages])
 
   async function submitChat(event: FormEvent<HTMLFormElement>) {
@@ -246,27 +252,17 @@ function createIntroMessage(): ChatMessage {
 }
 
 function readStoredChatMessages(): ChatMessage[] {
-  const stored = window.localStorage.getItem(CHAT_SESSION_KEY)
-
-  if (!stored) {
-    return [createIntroMessage()]
-  }
-
-  try {
-    const parsed = JSON.parse(stored)
-
-    if (!Array.isArray(parsed)) {
-      return [createIntroMessage()]
+  const restoredMessages = readStorageValue<ChatMessage[]>(storageKeys.chatSession, [], (value) => {
+    if (!Array.isArray(value)) {
+      return null
     }
 
-    const restoredMessages = parsed
+    return value
       .map((item): ChatMessage | null => normalizeStoredChatMessage(item))
       .filter((item): item is ChatMessage => Boolean(item))
+  })
 
-    return restoredMessages.length > 0 ? restoredMessages : [createIntroMessage()]
-  } catch {
-    return [createIntroMessage()]
-  }
+  return restoredMessages.length > 0 ? restoredMessages : [createIntroMessage()]
 }
 
 function normalizeStoredChatMessage(value: unknown): ChatMessage | null {
@@ -278,7 +274,7 @@ function normalizeStoredChatMessage(value: unknown): ChatMessage | null {
   const id = typeof message.id === 'string' && message.id ? message.id : createId()
 
   if (message.role === 'user') {
-    const body = normalizeStoredText(message.body)
+    const body = normalizeText(message.body)
 
     return body
       ? {
@@ -293,10 +289,10 @@ function normalizeStoredChatMessage(value: unknown): ChatMessage | null {
     return null
   }
 
-  const points = normalizeStoredStringList(message.points)
-  const title = normalizeStoredText(message.title)
-  const body = normalizeStoredText(message.body)
-  const nextStep = normalizeStoredText(message.nextStep)
+  const points = normalizeStringList(message.points)
+  const title = normalizeText(message.title)
+  const body = normalizeText(message.body)
+  const nextStep = normalizeText(message.nextStep)
 
   if (!title || !body || points.length === 0 || !nextStep) {
     return null
@@ -308,30 +304,15 @@ function normalizeStoredChatMessage(value: unknown): ChatMessage | null {
     title,
     body,
     points,
-    warning: normalizeStoredText(message.warning),
+    warning: normalizeText(message.warning),
     nextStep,
     source: message.source === 'gemini' ? 'gemini' : undefined,
-    relatedUserInput: normalizeStoredText(message.relatedUserInput),
-    handoffSummary: normalizeStoredText(message.handoffSummary),
-    medicineNote: normalizeOptionalStoredStringList(message.medicineNote),
-    recoveryPlan: normalizeOptionalStoredStringList(message.recoveryPlan),
-    safetyMessage: normalizeStoredText(message.safetyMessage),
+    relatedUserInput: normalizeText(message.relatedUserInput),
+    handoffSummary: normalizeText(message.handoffSummary),
+    medicineNote: normalizeOptionalStringList(message.medicineNote),
+    recoveryPlan: normalizeOptionalStringList(message.recoveryPlan),
+    safetyMessage: normalizeText(message.safetyMessage),
   }
-}
-
-function normalizeStoredText(value: unknown) {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined
-}
-
-function normalizeStoredStringList(value: unknown) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-    : []
-}
-
-function normalizeOptionalStoredStringList(value: unknown) {
-  const list = normalizeStoredStringList(value)
-  return list.length > 0 ? list : undefined
 }
 
 function createGeminiChatMessage(input: string, result: ChatAiResult): AssistantMessage {

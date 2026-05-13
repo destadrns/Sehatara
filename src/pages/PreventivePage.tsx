@@ -4,6 +4,12 @@ import FocusPanel from '../components/common/FocusPanel'
 import PageHero from '../components/common/PageHero'
 import { habitFocusOptions, weeklyRhythm } from '../data/preventiveData'
 import type { FeatureConfig, PageId, SavedWellnessPlan } from '../types/sehatara'
+import {
+  normalizeStringList,
+  readStorageRecordMap,
+  storageKeys,
+  writeStorageValue,
+} from '../utils/storage'
 
 type PreventivePageProps = {
   feature: FeatureConfig
@@ -17,8 +23,6 @@ type WellnessPlanProgress = {
   completedSteps: string[]
   completedDays: string[]
 }
-
-const WELLNESS_PLAN_PROGRESS_KEY = 'sehatara-wellness-plan-progress'
 
 function PreventivePage({
   feature,
@@ -54,7 +58,7 @@ function PreventivePage({
   ).length
 
   useEffect(() => {
-    window.localStorage.setItem(WELLNESS_PLAN_PROGRESS_KEY, JSON.stringify(planProgressById))
+    writeStorageValue(storageKeys.wellnessPlanProgress, planProgressById)
   }, [planProgressById])
 
   useEffect(() => {
@@ -513,34 +517,7 @@ function createEmptyWellnessPlanProgress(): WellnessPlanProgress {
 }
 
 function readWellnessPlanProgress(): Record<string, WellnessPlanProgress> {
-  const stored = window.localStorage.getItem(WELLNESS_PLAN_PROGRESS_KEY)
-
-  if (!stored) {
-    return {}
-  }
-
-  try {
-    const parsed = JSON.parse(stored)
-
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {}
-    }
-
-    return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, WellnessPlanProgress>>(
-      (progressMap, [id, value]) => {
-        const progress = normalizeWellnessPlanProgress(value)
-
-        if (progress) {
-          progressMap[id] = progress
-        }
-
-        return progressMap
-      },
-      {},
-    )
-  } catch {
-    return {}
-  }
+  return readStorageRecordMap(storageKeys.wellnessPlanProgress, normalizeWellnessPlanProgress)
 }
 
 function normalizeWellnessPlanProgress(value: unknown): WellnessPlanProgress | null {
@@ -554,15 +531,6 @@ function normalizeWellnessPlanProgress(value: unknown): WellnessPlanProgress | n
     completedSteps: normalizeStringList(progress.completedSteps),
     completedDays: normalizeStringList(progress.completedDays).filter((day) => weeklyRhythm.includes(day)),
   }
-}
-
-function normalizeStringList(value: unknown) {
-  return Array.isArray(value)
-    ? value
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : []
 }
 
 export default PreventivePage
