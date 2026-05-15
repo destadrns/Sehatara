@@ -80,6 +80,3 @@ const localizedPreventiveData = {
 export function getPreventiveData(language: LanguageMode) {
   return localizedPreventiveData[language]
 }
-
-export const habitFocusOptions = localizedPreventiveData.id.habitFocusOptions
-export const weeklyRhythm = localizedPreventiveData.id.weeklyRhythm

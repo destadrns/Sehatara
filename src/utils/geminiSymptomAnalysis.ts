@@ -1,16 +1,11 @@
 import type { SymptomAiInput, SymptomAiResult } from '../types/sehatara'
-
-export class GeminiAnalysisError extends Error {
-  code: string
-  status?: number
-
-  constructor(message: string, code = 'GEMINI_ANALYSIS_ERROR', status?: number) {
-    super(message)
-    this.name = 'GeminiAnalysisError'
-    this.code = code
-    this.status = status
-  }
-}
+import {
+  GeminiError,
+  extractErrorCode,
+  readGeminiJsonResponse,
+  requireStringListField,
+  requireTextField,
+} from './geminiCommon'
 
 export async function analyzeSymptom(input: SymptomAiInput): Promise<SymptomAiResult> {
   try {
@@ -22,20 +17,20 @@ export async function analyzeSymptom(input: SymptomAiInput): Promise<SymptomAiRe
       body: JSON.stringify(input),
     })
 
-    const payload = await readJsonResponse(response)
+    const payload = await readGeminiJsonResponse(response)
 
     if (!response.ok) {
-      const code = getPayloadErrorCode(payload, response.status)
-      throw new GeminiAnalysisError(createGeminiErrorMessage(code, input.language), code, response.status)
+      const code = extractErrorCode(payload, response.status)
+      throw new GeminiError(createGeminiErrorMessage(code, input.language), code, response.status)
     }
 
     return normalizeAiResult(payload?.result)
   } catch (error) {
-    if (error instanceof GeminiAnalysisError) {
+    if (error instanceof GeminiError) {
       throw error
     }
 
-    throw new GeminiAnalysisError(
+    throw new GeminiError(
       input.language === 'en'
         ? 'Gemini API cannot be reached yet. Make sure the local server is running and the internet connection is available.'
         : 'Gemini API belum bisa dihubungi. Pastikan server lokal masih hidup dan koneksi internet tersedia.',
@@ -45,7 +40,7 @@ export async function analyzeSymptom(input: SymptomAiInput): Promise<SymptomAiRe
 }
 
 export function getGeminiAnalysisErrorMessage(error: unknown, language = 'id') {
-  if (error instanceof GeminiAnalysisError) {
+  if (error instanceof GeminiError) {
     return error.message
   }
 
@@ -56,7 +51,7 @@ export function getGeminiAnalysisErrorMessage(error: unknown, language = 'id') {
 
 function normalizeAiResult(value: unknown): SymptomAiResult {
   if (!value || typeof value !== 'object') {
-    throw new GeminiAnalysisError(
+    throw new GeminiError(
       'Gemini merespons, tetapi format datanya tidak sesuai dengan kebutuhan aplikasi.',
       'GEMINI_INVALID_RESPONSE',
     )
@@ -67,43 +62,18 @@ function normalizeAiResult(value: unknown): SymptomAiResult {
 
   return {
     source: 'gemini',
-    title: requireText(record.title, 'title'),
-    summary: requireText(record.summary, 'summary'),
+    title: requireTextField(record.title, 'title'),
+    summary: requireTextField(record.summary, 'summary'),
     urgencyLevel,
-    redFlags: requireStringList(record.redFlags, 'redFlags'),
-    recommendation: requireText(record.recommendation, 'recommendation'),
-    careSteps: requireStringList(record.careSteps, 'careSteps'),
-    questionsToTrack: requireStringList(record.questionsToTrack, 'questionsToTrack'),
-    doctorVisitAdvice: requireStringList(record.doctorVisitAdvice, 'doctorVisitAdvice'),
-    medicineNote: requireStringList(record.medicineNote, 'medicineNote'),
-    recoveryPlan: requireStringList(record.recoveryPlan, 'recoveryPlan'),
-    safetyMessage: requireText(record.safetyMessage, 'safetyMessage'),
+    redFlags: requireStringListField(record.redFlags, 'redFlags'),
+    recommendation: requireTextField(record.recommendation, 'recommendation'),
+    careSteps: requireStringListField(record.careSteps, 'careSteps'),
+    questionsToTrack: requireStringListField(record.questionsToTrack, 'questionsToTrack'),
+    doctorVisitAdvice: requireStringListField(record.doctorVisitAdvice, 'doctorVisitAdvice'),
+    medicineNote: requireStringListField(record.medicineNote, 'medicineNote'),
+    recoveryPlan: requireStringListField(record.recoveryPlan, 'recoveryPlan'),
+    safetyMessage: requireTextField(record.safetyMessage, 'safetyMessage'),
   }
-}
-
-async function readJsonResponse(response: Response) {
-  const text = await response.text()
-
-  if (!text) {
-    return null
-  }
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new GeminiAnalysisError(
-      'Endpoint Gemini memberi respons yang tidak bisa dibaca sebagai JSON.',
-      'GEMINI_INVALID_JSON',
-    )
-  }
-}
-
-function getPayloadErrorCode(payload: unknown, status: number) {
-  if (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') {
-    return payload.error
-  }
-
-  return `GEMINI_HTTP_${status}`
 }
 
 function createGeminiErrorMessage(code: string, language = 'id') {
@@ -149,42 +119,8 @@ function parseUrgencyLevel(value: unknown): SymptomAiResult['urgencyLevel'] {
     return value
   }
 
-  throw new GeminiAnalysisError(
+  throw new GeminiError(
     'Gemini merespons, tetapi nilai urgencyLevel tidak sesuai schema.',
     'GEMINI_INVALID_RESPONSE',
   )
-}
-
-function requireText(value: unknown, fieldName: string) {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new GeminiAnalysisError(
-      `Gemini merespons, tetapi field ${fieldName} kosong atau tidak valid.`,
-      'GEMINI_INVALID_RESPONSE',
-    )
-  }
-
-  return value.trim()
-}
-
-function requireStringList(value: unknown, fieldName: string) {
-  if (!Array.isArray(value)) {
-    throw new GeminiAnalysisError(
-      `Gemini merespons, tetapi field ${fieldName} bukan daftar teks.`,
-      'GEMINI_INVALID_RESPONSE',
-    )
-  }
-
-  const cleaned = value
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean)
-
-  if (cleaned.length === 0) {
-    throw new GeminiAnalysisError(
-      `Gemini merespons, tetapi field ${fieldName} belum berisi data.`,
-      'GEMINI_INVALID_RESPONSE',
-    )
-  }
-
-  return cleaned
 }

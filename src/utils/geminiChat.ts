@@ -1,16 +1,11 @@
 import type { ChatAiInput, ChatAiResult } from '../types/sehatara'
-
-export class GeminiChatError extends Error {
-  code: string
-  status?: number
-
-  constructor(message: string, code = 'GEMINI_CHAT_ERROR', status?: number) {
-    super(message)
-    this.name = 'GeminiChatError'
-    this.code = code
-    this.status = status
-  }
-}
+import {
+  GeminiError,
+  extractErrorCode,
+  readGeminiJsonResponse,
+  requireStringListField,
+  requireTextField,
+} from './geminiCommon'
 
 export async function askGeminiChat(input: ChatAiInput): Promise<ChatAiResult> {
   try {
@@ -22,20 +17,20 @@ export async function askGeminiChat(input: ChatAiInput): Promise<ChatAiResult> {
       body: JSON.stringify(input),
     })
 
-    const payload = await readJsonResponse(response)
+    const payload = await readGeminiJsonResponse(response)
 
     if (!response.ok) {
-      const code = getPayloadErrorCode(payload, response.status)
-      throw new GeminiChatError(createGeminiChatErrorMessage(code, input.language), code, response.status)
+      const code = extractErrorCode(payload, response.status)
+      throw new GeminiError(createGeminiChatErrorMessage(code, input.language), code, response.status)
     }
 
     return normalizeChatResult(payload?.result)
   } catch (error) {
-    if (error instanceof GeminiChatError) {
+    if (error instanceof GeminiError) {
       throw error
     }
 
-    throw new GeminiChatError(
+    throw new GeminiError(
       input.language === 'en'
         ? 'Gemini API cannot be reached yet. Make sure the local server is running and the internet connection is available.'
         : 'Gemini API belum bisa dihubungi. Pastikan server lokal masih hidup dan koneksi internet tersedia.',
@@ -45,7 +40,7 @@ export async function askGeminiChat(input: ChatAiInput): Promise<ChatAiResult> {
 }
 
 export function getGeminiChatErrorMessage(error: unknown, language = 'id') {
-  if (error instanceof GeminiChatError) {
+  if (error instanceof GeminiError) {
     return error.message
   }
 
@@ -56,7 +51,7 @@ export function getGeminiChatErrorMessage(error: unknown, language = 'id') {
 
 function normalizeChatResult(value: unknown): ChatAiResult {
   if (!value || typeof value !== 'object') {
-    throw new GeminiChatError(
+    throw new GeminiError(
       'Gemini merespons, tetapi format jawaban chat tidak sesuai kebutuhan aplikasi.',
       'GEMINI_INVALID_RESPONSE',
     )
@@ -67,41 +62,16 @@ function normalizeChatResult(value: unknown): ChatAiResult {
 
   return {
     source: 'gemini',
-    title: requireText(record.title, 'title'),
-    body: requireText(record.body, 'body'),
-    points: requireStringList(record.points, 'points'),
+    title: requireTextField(record.title, 'title'),
+    body: requireTextField(record.body, 'body'),
+    points: requireStringListField(record.points, 'points'),
     warning: warning || undefined,
-    nextStep: requireText(record.nextStep, 'nextStep'),
-    medicineNote: requireStringList(record.medicineNote, 'medicineNote'),
-    recoveryPlan: requireStringList(record.recoveryPlan, 'recoveryPlan'),
-    handoffSummary: requireText(record.handoffSummary, 'handoffSummary'),
-    safetyMessage: requireText(record.safetyMessage, 'safetyMessage'),
+    nextStep: requireTextField(record.nextStep, 'nextStep'),
+    medicineNote: requireStringListField(record.medicineNote, 'medicineNote'),
+    recoveryPlan: requireStringListField(record.recoveryPlan, 'recoveryPlan'),
+    handoffSummary: requireTextField(record.handoffSummary, 'handoffSummary'),
+    safetyMessage: requireTextField(record.safetyMessage, 'safetyMessage'),
   }
-}
-
-async function readJsonResponse(response: Response) {
-  const text = await response.text()
-
-  if (!text) {
-    return null
-  }
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new GeminiChatError(
-      'Endpoint Gemini memberi respons chat yang tidak bisa dibaca sebagai JSON.',
-      'GEMINI_INVALID_JSON',
-    )
-  }
-}
-
-function getPayloadErrorCode(payload: unknown, status: number) {
-  if (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') {
-    return payload.error
-  }
-
-  return `GEMINI_HTTP_${status}`
 }
 
 function createGeminiChatErrorMessage(code: string, language = 'id') {
@@ -146,38 +116,4 @@ function createGeminiChatErrorMessage(code: string, language = 'id') {
   return en
     ? 'Gemini API cannot answer the chat yet. Check the API key, connection, and restart the local server.'
     : 'Gemini API belum bisa menjawab chat. Cek API key, koneksi, dan restart server lokal.'
-}
-
-function requireText(value: unknown, fieldName: string) {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new GeminiChatError(
-      `Gemini merespons, tetapi field ${fieldName} kosong atau tidak valid.`,
-      'GEMINI_INVALID_RESPONSE',
-    )
-  }
-
-  return value.trim()
-}
-
-function requireStringList(value: unknown, fieldName: string) {
-  if (!Array.isArray(value)) {
-    throw new GeminiChatError(
-      `Gemini merespons, tetapi field ${fieldName} bukan daftar teks.`,
-      'GEMINI_INVALID_RESPONSE',
-    )
-  }
-
-  const cleaned = value
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean)
-
-  if (cleaned.length === 0) {
-    throw new GeminiChatError(
-      `Gemini merespons, tetapi field ${fieldName} belum berisi data.`,
-      'GEMINI_INVALID_RESPONSE',
-    )
-  }
-
-  return cleaned
 }

@@ -48,7 +48,3 @@ const localizedSymptomOptions: Record<LanguageMode, {
 export function getSymptomOptions(language: LanguageMode) {
   return localizedSymptomOptions[language]
 }
-
-export const durationOptions = localizedSymptomOptions.id.durationOptions
-export const symptomAreas = localizedSymptomOptions.id.symptomAreas
-export const redFlags = localizedSymptomOptions.id.redFlags

@@ -36,6 +36,3 @@ const localizedMentalData = {
 export function getMentalData(language: LanguageMode) {
   return localizedMentalData[language]
 }
-
-export const breathingSteps = localizedMentalData.id.breathingSteps
-export const groundingSteps = localizedMentalData.id.groundingSteps

@@ -16,5 +16,3 @@ const localizedChatStarterPrompts: Record<LanguageMode, string[]> = {
 export function getChatStarterPrompts(language: LanguageMode) {
   return localizedChatStarterPrompts[language]
 }
-
-export const chatStarterPrompts = getChatStarterPrompts('id')

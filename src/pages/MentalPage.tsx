@@ -72,7 +72,7 @@ function MentalPage({ feature, language, onNavigate }: MentalPageProps) {
   const [sessionRecords, setSessionRecords] = useState<CalmSessionRecord[]>(readCalmSessionRecords)
   const activeSession = useMemo(
     () => calmSessionOptions.find((option) => option.id === activeMode) ?? calmSessionOptions[0],
-    [activeMode],
+    [activeMode, calmSessionOptions],
   )
   const elapsedSeconds = activeSession.durationSeconds - remainingSeconds
   const progressPercent = Math.min(100, Math.round((elapsedSeconds / activeSession.durationSeconds) * 100))
@@ -256,7 +256,7 @@ function MentalPage({ feature, language, onNavigate }: MentalPageProps) {
                       <strong>{getModeLabel(record.mode, language)}</strong>
                       <span>
                         {copy.completedSession} - {formatDuration(record.durationSeconds, copy.minutes)} - {getMoodLabel(record.mood, language)} -{' '}
-                        {formatShortDateTime(record.createdAt)}
+                        {formatShortDateTime(record.createdAt, undefined, language)}
                       </span>
                     </div>
                     <button

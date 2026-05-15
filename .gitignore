@@ -13,8 +13,6 @@ dist-ssr
 *.local
 preview-*.png
 .chrome-*
-SEHATARA_FUNCTIONAL_ROADMAP.md
-SEHATARA_TANYA_AI_ROADMAP.md
 
 # Editor directories and files
 .vscode/*

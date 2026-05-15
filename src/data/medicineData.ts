@@ -156,6 +156,3 @@ const localizedMedicineData = {
 export function getMedicineData(language: LanguageMode) {
   return localizedMedicineData[language]
 }
-
-export const medicineTopics = localizedMedicineData.id.medicineTopics
-export const medicineChecklist = localizedMedicineData.id.medicineChecklist
